@@ -41,7 +41,8 @@ A csoportkör egy gombnyomással újrasorsolható.
 ```pseudo
 function generateGroupStageMatches(groupPlayers, config):
     matches = []
-    shuffledPlayers = randomShuffle(groupPlayers)
+    availablePlayers = groupPlayers.filter(p => !p.alreadyScheduled)
+    shuffledPlayers = randomShuffle(availablePlayers)
 
     for playerA in shuffledPlayers:
         if playerA.alreadyScheduled:
