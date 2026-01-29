@@ -1,0 +1,4 @@
+GET http://localhost:5000/api/groups/697b143713f12e84a74e5e8d/winner
+
+
+//697b143713f12e84a74e5e8d

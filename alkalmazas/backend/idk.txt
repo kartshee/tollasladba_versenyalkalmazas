@@ -1,0 +1,587 @@
+GET http://localhost:5000/api/players
+
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 428
+ETag: W/"1ac-AWWGWqr+3mXXH+8bCSxHLO8bNN8"
+Date: Thu, 29 Jan 2026 08:01:46 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+[
+  {
+    "_id": "697b13a113f12e84a74e5e7e",
+    "name": "Player 1",
+    "__v": 0
+  },
+  {
+    "_id": "697b13a813f12e84a74e5e80",
+    "name": "Player 2",
+    "__v": 0
+  },
+  {
+    "_id": "697b13aa13f12e84a74e5e82",
+    "name": "Player 3",
+    "__v": 0
+  },
+  {
+    "_id": "697b13ad13f12e84a74e5e84",
+    "name": "Player 4",
+    "__v": 0
+  },
+  {
+    "_id": "697b13af13f12e84a74e5e86",
+    "name": "Player 5",
+    "__v": 0
+  },
+  {
+    "_id": "697b13b213f12e84a74e5e88",
+    "name": "Player 6",
+    "__v": 0
+  },
+  {
+    "_id": "697b13b513f12e84a74e5e8a",
+    "name": "Player 7",
+    "__v": 0
+  }
+]
+Response file saved.
+> 2026-01-29T090146.200.json
+
+Response code: 200 (OK); Time: 27ms (27 ms); Content length: 428 bytes (428 B)
+
+
+
+POST http://localhost:5000/api/groups
+
+HTTP/1.1 201 Created
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 274
+ETag: W/"112-Ik3jSnZXknWdm7dIVu6uxBcBQBE"
+Date: Thu, 29 Jan 2026 08:03:03 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{
+  "name": "Teszt Csoport (6 fő)",
+  "players": [
+    "697b13a113f12e84a74e5e7e",
+    "697b13a813f12e84a74e5e80",
+    "697b13aa13f12e84a74e5e82",
+    "697b13ad13f12e84a74e5e84",
+    "697b13af13f12e84a74e5e86",
+    "697b13b213f12e84a74e5e88",
+    "697b13b513f12e84a74e5e8a"
+  ],
+  "_id": "697b143713f12e84a74e5e8d",
+  "__v": 0
+}
+Response file saved.
+> 2026-01-29T090303.201.json
+
+Response code: 201 (Created); Time: 38ms (38 ms); Content length: 273 bytes (273 B)
+
+
+
+///////////////////////////////
+GET http://localhost:5000/api/matches/group/697b143713f12e84a74e5e8d
+
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 4873
+ETag: W/"1309-5i3DPMFA8XsBuw7SaQbVKkv0+vo"
+Date: Thu, 29 Jan 2026 08:22:23 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+[
+  {
+    "_id": "697b146213f12e84a74e5e92",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13a113f12e84a74e5e7e",
+      "name": "Player 1"
+    },
+    "player2": {
+      "_id": "697b13a813f12e84a74e5e80",
+      "name": "Player 2"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5e93",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13a113f12e84a74e5e7e",
+      "name": "Player 1"
+    },
+    "player2": {
+      "_id": "697b13aa13f12e84a74e5e82",
+      "name": "Player 3"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5e94",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13a113f12e84a74e5e7e",
+      "name": "Player 1"
+    },
+    "player2": {
+      "_id": "697b13ad13f12e84a74e5e84",
+      "name": "Player 4"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5e95",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13a113f12e84a74e5e7e",
+      "name": "Player 1"
+    },
+    "player2": {
+      "_id": "697b13af13f12e84a74e5e86",
+      "name": "Player 5"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5e96",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13a113f12e84a74e5e7e",
+      "name": "Player 1"
+    },
+    "player2": {
+      "_id": "697b13b213f12e84a74e5e88",
+      "name": "Player 6"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5e97",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13a113f12e84a74e5e7e",
+      "name": "Player 1"
+    },
+    "player2": {
+      "_id": "697b13b513f12e84a74e5e8a",
+      "name": "Player 7"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5e98",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13a813f12e84a74e5e80",
+      "name": "Player 2"
+    },
+    "player2": {
+      "_id": "697b13aa13f12e84a74e5e82",
+      "name": "Player 3"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5e99",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13a813f12e84a74e5e80",
+      "name": "Player 2"
+    },
+    "player2": {
+      "_id": "697b13ad13f12e84a74e5e84",
+      "name": "Player 4"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5e9a",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13a813f12e84a74e5e80",
+      "name": "Player 2"
+    },
+    "player2": {
+      "_id": "697b13af13f12e84a74e5e86",
+      "name": "Player 5"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5e9b",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13a813f12e84a74e5e80",
+      "name": "Player 2"
+    },
+    "player2": {
+      "_id": "697b13b213f12e84a74e5e88",
+      "name": "Player 6"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5e9c",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13a813f12e84a74e5e80",
+      "name": "Player 2"
+    },
+    "player2": {
+      "_id": "697b13b513f12e84a74e5e8a",
+      "name": "Player 7"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5e9d",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13aa13f12e84a74e5e82",
+      "name": "Player 3"
+    },
+    "player2": {
+      "_id": "697b13ad13f12e84a74e5e84",
+      "name": "Player 4"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5e9e",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13aa13f12e84a74e5e82",
+      "name": "Player 3"
+    },
+    "player2": {
+      "_id": "697b13af13f12e84a74e5e86",
+      "name": "Player 5"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5e9f",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13aa13f12e84a74e5e82",
+      "name": "Player 3"
+    },
+    "player2": {
+      "_id": "697b13b213f12e84a74e5e88",
+      "name": "Player 6"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5ea0",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13aa13f12e84a74e5e82",
+      "name": "Player 3"
+    },
+    "player2": {
+      "_id": "697b13b513f12e84a74e5e8a",
+      "name": "Player 7"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5ea1",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13ad13f12e84a74e5e84",
+      "name": "Player 4"
+    },
+    "player2": {
+      "_id": "697b13af13f12e84a74e5e86",
+      "name": "Player 5"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5ea2",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13ad13f12e84a74e5e84",
+      "name": "Player 4"
+    },
+    "player2": {
+      "_id": "697b13b213f12e84a74e5e88",
+      "name": "Player 6"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5ea3",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13ad13f12e84a74e5e84",
+      "name": "Player 4"
+    },
+    "player2": {
+      "_id": "697b13b513f12e84a74e5e8a",
+      "name": "Player 7"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5ea4",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13af13f12e84a74e5e86",
+      "name": "Player 5"
+    },
+    "player2": {
+      "_id": "697b13b213f12e84a74e5e88",
+      "name": "Player 6"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5ea5",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13af13f12e84a74e5e86",
+      "name": "Player 5"
+    },
+    "player2": {
+      "_id": "697b13b513f12e84a74e5e8a",
+      "name": "Player 7"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  },
+  {
+    "_id": "697b146213f12e84a74e5ea6",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13b213f12e84a74e5e88",
+      "name": "Player 6"
+    },
+    "player2": {
+      "_id": "697b13b513f12e84a74e5e8a",
+      "name": "Player 7"
+    },
+    "round": "group",
+    "__v": 0,
+    "sets": []
+  }
+]
+Response file saved.
+> 2026-01-29T092223.200.json
+
+Response code: 200 (OK); Time: 60ms (60 ms); Content length: 4873 bytes (4,87 kB)
+
+
+itt van a standings:
+GET http://localhost:5000/api/groups/697b143713f12e84a74e5e8d/standings
+
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 645
+ETag: W/"285-+HAT4go1JNT08OFF7++kCeoPlfE"
+Date: Thu, 29 Jan 2026 08:54:48 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+[
+  {
+    "player": {
+      "_id": "697b13b213f12e84a74e5e88",
+      "name": "Player 6",
+      "__v": 0
+    },
+    "wins": 5,
+    "played": 6
+  },
+  {
+    "player": {
+      "_id": "697b13a113f12e84a74e5e7e",
+      "name": "Player 1",
+      "__v": 0
+    },
+    "wins": 5,
+    "played": 6
+  },
+  {
+    "player": {
+      "_id": "697b13aa13f12e84a74e5e82",
+      "name": "Player 3",
+      "__v": 0
+    },
+    "wins": 4,
+    "played": 6
+  },
+  {
+    "player": {
+      "_id": "697b13ad13f12e84a74e5e84",
+      "name": "Player 4",
+      "__v": 0
+    },
+    "wins": 3,
+    "played": 6
+  },
+  {
+    "player": {
+      "_id": "697b13a813f12e84a74e5e80",
+      "name": "Player 2",
+      "__v": 0
+    },
+    "wins": 2,
+    "played": 6
+  },
+  {
+    "player": {
+      "_id": "697b13af13f12e84a74e5e86",
+      "name": "Player 5",
+      "__v": 0
+    },
+    "wins": 1,
+    "played": 6
+  },
+  {
+    "player": {
+      "_id": "697b13b513f12e84a74e5e8a",
+      "name": "Player 7",
+      "__v": 0
+    },
+    "wins": 1,
+    "played": 6
+  }
+]
+Response file saved.
+> 2026-01-29T095448.200.json
+
+Response code: 200 (OK); Time: 85ms (85 ms); Content length: 645 bytes (645 B)
+
+itt pedig a meccsek:
+
+
+//////////////////////////
+semis:
+GET http://localhost:5000/api/groups/697b143713f12e84a74e5e8d/playoff
+
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 507
+ETag: W/"1fb-4hFQZ+uRubhtLcVygyEuwq6o7yY"
+Date: Thu, 29 Jan 2026 09:07:10 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+[
+  {
+    "_id": "697b232e9245db9956abd42e",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13b213f12e84a74e5e88",
+      "name": "Player 6"
+    },
+    "player2": {
+      "_id": "697b13ad13f12e84a74e5e84",
+      "name": "Player 4"
+    },
+    "sets": [],
+    "winner": null,
+    "round": "playoff_semi",
+    "__v": 0
+  },
+  {
+    "_id": "697b232e9245db9956abd42f",
+    "groupId": "697b143713f12e84a74e5e8d",
+    "player1": {
+      "_id": "697b13a113f12e84a74e5e7e",
+      "name": "Player 1"
+    },
+    "player2": {
+      "_id": "697b13aa13f12e84a74e5e82",
+      "name": "Player 3"
+    },
+    "sets": [],
+    "winner": null,
+    "round": "playoff_semi",
+    "__v": 0
+  }
+]
+Response file saved.
+> 2026-01-29T100710.200.json
+
+Response code: 200 (OK); Time: 48ms (48 ms); Content length: 507 bytes (507 B)
+
+
+////////////
+final:
+POST http://localhost:5000/api/groups/697b143713f12e84a74e5e8d/playoff/final
+
+HTTP/1.1 201 Created
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 201
+ETag: W/"c9-5PnM1LDXKnhUMeYBB1u+WtlLLYk"
+Date: Thu, 29 Jan 2026 09:08:46 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{
+  "groupId": "697b143713f12e84a74e5e8d",
+  "player1": "697b13b213f12e84a74e5e88",
+  "player2": "697b13a113f12e84a74e5e7e",
+  "sets": [],
+  "winner": null,
+  "round": "playoff_final",
+  "_id": "697b239e9245db9956abd43a",
+  "__v": 0
+}
+Response file saved.
+> 2026-01-29T100846.201.json
+
+Response code: 201 (Created); Time: 81ms (81 ms); Content length: 201 bytes (201 B)
