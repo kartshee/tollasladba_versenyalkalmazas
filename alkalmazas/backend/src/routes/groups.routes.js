@@ -1,30 +1,41 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import Group from '../models/Group.js';
 import Match from '../models/Match.js';
+import Player from '../models/Player.js';
+import Tournament from '../models/Tournament.js';
+import Category from '../models/Category.js';
 
 const router = Router();
+const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 function computeStandings(groupPlayers, finishedGroupMatches) {
     const stats = {};
-    groupPlayers.forEach(p => {
+    groupPlayers.forEach((p) => {
         stats[p._id.toString()] = { player: p, wins: 0, played: 0 };
     });
 
-    finishedGroupMatches.forEach(m => {
+    finishedGroupMatches.forEach((m) => {
         const p1 = m.player1.toString();
         const p2 = m.player2.toString();
 
-        stats[p1].played++;
-        stats[p2].played++;
-        stats[m.winner.toString()].wins++;
+        if (stats[p1]) stats[p1].played++;
+        if (stats[p2]) stats[p2].played++;
+
+        const w = m.winner?.toString();
+        if (w && stats[w]) stats[w].wins++;
     });
 
     return Object.values(stats).sort((a, b) => {
         if (b.wins !== a.wins) return b.wins - a.wins;
 
-        const headToHead = finishedGroupMatches.find(m =>
-            (m.player1.toString() === a.player._id.toString() && m.player2.toString() === b.player._id.toString()) ||
-            (m.player1.toString() === b.player._id.toString() && m.player2.toString() === a.player._id.toString())
+        // 2 fős tie-break: head-to-head
+        const headToHead = finishedGroupMatches.find(
+            (m) =>
+                (m.player1.toString() === a.player._id.toString() &&
+                    m.player2.toString() === b.player._id.toString()) ||
+                (m.player1.toString() === b.player._id.toString() &&
+                    m.player2.toString() === a.player._id.toString())
         );
 
         if (headToHead?.winner) {
@@ -36,17 +47,69 @@ function computeStandings(groupPlayers, finishedGroupMatches) {
     });
 }
 
-
-
-
-
 /**
  * Group létrehozása
- * body: { name, players: [playerId, ...], tournamentId? }
+ * body: { tournamentId, categoryId, name, players: [playerId, ...] }
  */
 router.post('/', async (req, res) => {
     try {
-        const group = await Group.create(req.body);
+        const { tournamentId, categoryId, name, players } = req.body;
+
+        if (!tournamentId || !isValidId(tournamentId)) {
+            return res.status(400).json({ error: 'Invalid tournamentId' });
+        }
+        if (!categoryId || !isValidId(categoryId)) {
+            return res.status(400).json({ error: 'Invalid categoryId' });
+        }
+        if (!name || typeof name !== 'string' || !name.trim()) {
+            return res.status(400).json({ error: 'Group name is required' });
+        }
+        if (!Array.isArray(players)) {
+            return res.status(400).json({ error: 'players must be an array' });
+        }
+
+        // Duplikátumok tiltása
+        const unique = new Set(players.map(String));
+        if (unique.size !== players.length) {
+            return res.status(400).json({ error: 'Duplicate playerId in group' });
+        }
+
+        const t = await Tournament.findById(tournamentId);
+        if (!t) return res.status(404).json({ error: 'Tournament not found' });
+
+        if (t.status !== 'draft') {
+            return res.status(409).json({ error: 'Tournament is not editable unless status=draft' });
+        }
+
+        const c = await Category.findById(categoryId);
+        if (!c) return res.status(404).json({ error: 'Category not found' });
+
+        // Category ugyanahhoz a tournamenthez tartozzon
+        if (c.tournamentId.toString() !== tournamentId.toString()) {
+            return res.status(400).json({ error: 'Category does not belong to tournament' });
+        }
+
+        // Player validáció: létezzenek és ugyanahhoz a tournamenthez tartozzanak
+        if (players.length > 0) {
+            const dbPlayers = await Player.find({ _id: { $in: players } }, { tournamentId: 1 });
+            if (dbPlayers.length !== players.length) {
+                return res.status(400).json({ error: 'One or more players not found' });
+            }
+            const wrong = dbPlayers.find(
+                (p) => p.tournamentId.toString() !== tournamentId.toString()
+            );
+            if (wrong) {
+                return res.status(400).json({ error: 'One or more players belong to another tournament' });
+            }
+        }
+
+        const group = await Group.create({
+            tournamentId,
+            categoryId,
+            name: name.trim(),
+            players
+        });
+
         res.status(201).json(group);
     } catch (err) {
         res.status(400).json({ error: err.message });
@@ -55,9 +118,29 @@ router.post('/', async (req, res) => {
 
 /**
  * Groupok listázása player adatokkal
+ * opcionális: ?tournamentId=...  ?categoryId=...
  */
 router.get('/', async (req, res) => {
-    const groups = await Group.find().populate('players', 'name');
+    const filter = {};
+
+    if (req.query.tournamentId) {
+        if (!isValidId(req.query.tournamentId)) {
+            return res.status(400).json({ error: 'Invalid tournamentId' });
+        }
+        filter.tournamentId = req.query.tournamentId;
+    }
+
+    if (req.query.categoryId) {
+        if (!isValidId(req.query.categoryId)) {
+            return res.status(400).json({ error: 'Invalid categoryId' });
+        }
+        filter.categoryId = req.query.categoryId;
+    }
+
+    const groups = await Group.find(filter)
+        .populate('players', 'name club')
+        .sort({ createdAt: -1 });
+
     res.json(groups);
 });
 
@@ -65,6 +148,10 @@ router.get('/', async (req, res) => {
  * Standings (wins + head-to-head tie-break)
  */
 router.get('/:groupId/standings', async (req, res) => {
+    if (!isValidId(req.params.groupId)) {
+        return res.status(400).json({ error: 'Invalid groupId' });
+    }
+
     const group = await Group.findById(req.params.groupId).populate('players');
     if (!group) return res.status(404).json({ error: 'Group not found' });
 
@@ -72,18 +159,21 @@ router.get('/:groupId/standings', async (req, res) => {
         groupId: group._id,
         round: 'group',
         winner: { $ne: null },
-        'sets.1': { $exists: true } // legalább 2 set legyen
+        'sets.1': { $exists: true } // legalább 2 szett
     });
 
     const standings = computeStandings(group.players, matches);
     res.json(standings);
 });
 
-
 /**
  * Playoff meccsek lekérése a groupból
  */
 router.get('/:groupId/playoff', async (req, res) => {
+    if (!isValidId(req.params.groupId)) {
+        return res.status(400).json({ error: 'Invalid groupId' });
+    }
+
     const semis = await Match.find({ groupId: req.params.groupId, round: 'playoff_semi' })
         .populate('player1', 'name')
         .populate('player2', 'name')
@@ -97,26 +187,29 @@ router.get('/:groupId/playoff', async (req, res) => {
     res.json({ semis, final });
 });
 
-
 /**
  * Playoff generálása (top4 -> 2 elődöntő)
  */
 router.post('/:groupId/playoff', async (req, res) => {
+    if (!isValidId(req.params.groupId)) {
+        return res.status(400).json({ error: 'Invalid groupId' });
+    }
+
     const group = await Group.findById(req.params.groupId).populate('players');
     if (!group) return res.status(404).json({ error: 'Group not found' });
 
-    // 1) Csoportkör kész?
+    // Csoportkör kész?
     const groupMatches = await Match.find({ groupId: group._id, round: 'group' });
-    const unfinished = groupMatches.filter(m => !m.winner || !m.sets || m.sets.length < 2);
+    const unfinished = groupMatches.filter((m) => !m.winner || !m.sets || m.sets.length < 2);
     if (unfinished.length > 0) {
         return res.status(400).json({
             error: 'Group stage not finished',
             unfinishedCount: unfinished.length,
-            unfinishedIds: unfinished.map(m => m._id)
+            unfinishedIds: unfinished.map((m) => m._id)
         });
     }
 
-    // 2) Nincs-e már playoff?
+    // Nincs-e már playoff?
     const existingPlayoff = await Match.findOne({
         groupId: group._id,
         round: { $in: ['playoff_semi', 'playoff_final'] }
@@ -125,16 +218,11 @@ router.post('/:groupId/playoff', async (req, res) => {
         return res.status(409).json({ error: 'Playoff already generated for this group' });
     }
 
-    // 3) Standings (helperrel)
-    const finishedGroupMatches = groupMatches; // itt már mind finished
-    const standings = computeStandings(group.players, finishedGroupMatches);
+    // Standings
+    const standings = computeStandings(group.players, groupMatches);
+    const top4 = standings.slice(0, 4).map((x) => x.player._id);
+    if (top4.length < 4) return res.status(400).json({ error: 'Need at least 4 players for playoff' });
 
-    const top4 = standings.slice(0, 4).map(x => x.player._id);
-    if (top4.length < 4) {
-        return res.status(400).json({ error: 'Need at least 4 players for playoff' });
-    }
-
-    // 4) Elődöntők: #1 vs #4, #2 vs #3 (seed info-val)
     const created = await Match.insertMany([
         {
             groupId: group._id,
@@ -143,7 +231,7 @@ router.post('/:groupId/playoff', async (req, res) => {
             player2: top4[3],
             round: 'playoff_semi',
             sets: [],
-            winner: null,
+            winner: null
         },
         {
             groupId: group._id,
@@ -152,55 +240,48 @@ router.post('/:groupId/playoff', async (req, res) => {
             player2: top4[2],
             round: 'playoff_semi',
             sets: [],
-            winner: null,
+            winner: null
         }
     ]);
 
-    // 5) Populáljuk vissza névvel (frontendnek hasznos)
-    const semiFinals = await Match.find({ _id: { $in: created.map(m => m._id) } })
+    const semiFinals = await Match.find({ _id: { $in: created.map((m) => m._id) } })
         .populate('player1', 'name')
         .populate('player2', 'name')
         .populate('winner', 'name');
 
-    // 6) Strukturált response
     res.status(201).json({
         groupId: group._id,
-        top4: standings.slice(0, 4).map(s => ({
+        top4: standings.slice(0, 4).map((s) => ({
             id: s.player._id,
             name: s.player.name,
             wins: s.wins
         })),
-        playoff: {
-            semis: semiFinals
-        }
+        playoff: { semis: semiFinals }
     });
 });
 
-
 /**
  * Döntő generálása a két elődöntő winneréből
- * Feltétel: 2 db playoff_semi van és mindkettőnek van winner-e
  */
 router.post('/:groupId/playoff/final', async (req, res) => {
     const groupId = req.params.groupId;
+    if (!isValidId(groupId)) return res.status(400).json({ error: 'Invalid groupId' });
 
     const semis = await Match.find({ groupId, round: 'playoff_semi' });
     if (semis.length !== 2) {
         return res.status(400).json({ error: 'Need exactly 2 semifinals to create final' });
     }
 
-    const notFinished = semis.filter(m => !m.winner);
+    const notFinished = semis.filter((m) => !m.winner);
     if (notFinished.length > 0) {
         return res.status(400).json({
             error: 'Semifinals not finished',
-            missingWinnerIds: notFinished.map(m => m._id)
+            missingWinnerIds: notFinished.map((m) => m._id)
         });
     }
 
     const existingFinal = await Match.findOne({ groupId, round: 'playoff_final' });
-    if (existingFinal) {
-        return res.status(409).json({ error: 'Final already exists', finalId: existingFinal._id });
-    }
+    if (existingFinal) return res.status(409).json({ error: 'Final already exists', finalId: existingFinal._id });
 
     const final = await Match.create({
         groupId,
@@ -216,6 +297,10 @@ router.post('/:groupId/playoff/final', async (req, res) => {
 });
 
 router.get('/:groupId/winner', async (req, res) => {
+    if (!isValidId(req.params.groupId)) {
+        return res.status(400).json({ error: 'Invalid groupId' });
+    }
+
     const final = await Match.findOne({
         groupId: req.params.groupId,
         round: 'playoff_final',
@@ -225,14 +310,9 @@ router.get('/:groupId/winner', async (req, res) => {
         .populate('player1', 'name')
         .populate('player2', 'name');
 
-    if (!final) {
-        return res.status(404).json({ error: 'Final not finished or not found' });
-    }
+    if (!final) return res.status(404).json({ error: 'Final not finished or not found' });
 
-    res.json({
-        champion: final.winner,
-        finalMatch: final
-    });
+    res.json({ champion: final.winner, finalMatch: final });
 });
 
 export default router;

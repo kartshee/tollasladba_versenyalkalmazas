@@ -1,10 +1,15 @@
 import mongoose from 'mongoose';
 
 const groupSchema = new mongoose.Schema({
+    categoryId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category',
+        required: true
+    },
     tournamentId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Tournament',
-        required: false
+        required: true
     },
     name: {
         type: String,

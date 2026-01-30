@@ -1,4 +1,9 @@
-GET http://localhost:5000/api/groups/697b143713f12e84a74e5e8d/winner
+PATCH http://localhost:5000/api/matches/697c7f4ce1128dfc81f43748/result
+Content-Type: application/json
 
-
-//697b143713f12e84a74e5e8d
+{
+  "sets": [
+    { "p1": 21, "p2": 10 },
+    { "p1": 21, "p2": 11 }
+  ]
+}

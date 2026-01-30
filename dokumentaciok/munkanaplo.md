@@ -1,4 +1,4 @@
-# Munkanapló (összefoglaló) – Backend fejlesztés
+# Munkanapló (összefoglaló) – Backend fejlesztés 2026.10.29
 
 ## 1) Fejlesztőkörnyezet és szerverindítás stabilizálása
 - Node/Express backend futtatása `nodemon`-nal.
@@ -87,3 +87,121 @@
 - Tie-break bővítés 3+ fős holtverseny esetére (szettarány / pontarány).
 - Tournament szintű konfigurátor (korcsoport/nem, csoportszám, továbbjutók, stb.).
 - Ágrajz vizualizáció és PDF export.
+
+
+--------------------------------------------------------------------------------------
+# Munkanapló (összefoglaló) – Backend fejlesztés 2026.01.30.
+# Devlog — 2026-01-30
+
+## Cél
+- Group stage (round-robin) meccsek: generálás, ütemezés (scheduler), státusz váltás, eredmény rögzítés és *utólagos javítás* támogatása.
+- Stabilabb API viselkedés: ne dobjon 500-at, ha hiányzik a JSON body.
+
+## Elvégzett munka (Backend)
+
+### 1) Group meccsek generálása
+**Fájl:** `backend/src/routes/matches.routes.js` (group generate route)
+- `POST /api/matches/group/:groupId`
+- Round-robin párosítás létrehozása a group játékosai alapján.
+- Duplikáció védelem: ha már vannak `round=group` meccsek a groupban, 409-cel visszatér.
+
+**Eredmény:** meccsek létrejönnek `pending` státusszal.
+
+---
+
+### 2) Scheduler stabilizálás + reset endpoint
+**Fájl:** `backend/src/routes/matches.routes.js`
+
+#### 2.1 Ütemezés
+- `POST /api/matches/group/:groupId/schedule`
+- Validációk:
+  - JSON body hiány esetén: 400 hiba (nem 500).
+  - `startAt`, `courtsCount`, `matchMinutes`, `playerRestMinutes`, `courtTurnoverMinutes` ellenőrzések.
+- `force` logika:
+  - `force=false`: csak a még nem ütemezett (startAt = null) pending meccseket ütemezi.
+  - `force=true`: pending meccseket újraütemezi akkor is, ha már volt startAt.
+
+**Eredmény:** sikeres ütemezés esetén `scheduled: 15` és visszaadja a meccseket időrendben.
+
+#### 2.2 Ütemezés reset
+- `PATCH /api/matches/group/:groupId/schedule/reset`
+- Csak `pending` + `round=group` meccsekre:
+  - `startAt/endAt/courtNumber` nullázása
+- Nem nyúl `running/finished` meccsekhez.
+
+**Eredmény:** gyors “takarítás”, majd újra lehet schedule-özni tiszta állapotból.
+
+---
+
+### 3) Match státusz kezelés (pending <-> running)
+**Fájl:** `backend/src/routes/matches.routes.js` (status route)
+- `PATCH /api/matches/:matchId/status`
+- Stabilizálás: ha nincs JSON body vagy hiányzik a `status`, akkor 400-at ad (nem 500).
+- Védelmek:
+  - `finished` státuszt nem enged átállítani status route-tal (409).
+  - `running` csak `pending`-ből indítható.
+- Tényleges kezdés mérése:
+  - `actualStartAt` beállítása `running`-ra váltáskor (ha még üres).
+
+**Eredmény:** működő és védett státuszváltás.
+
+---
+
+### 4) Eredmény rögzítés + utólagos módosítás támogatása
+**Fájl:** `backend/src/routes/matches.routes.js` (result route)
+- `PATCH /api/matches/:matchId/result`
+- Validálás:
+  - 2 vagy 3 szett
+  - pontok számai
+  - badminton set score validálás
+- Winner újraszámolás a szettek alapján.
+- `finished` státusz beállítás + `actualEndAt` rögzítés.
+
+**Kiemelt eredmény:** teszt alapján **ugyanazzal a result endpointtal utólag is felülírható a sets**, és a winner újraszámolódik. (Ez kell az “rosszul mondták be az eredményt” esetre.)
+
+---
+
+## Model / Schema változások
+**Fájl:** `backend/src/models/Match.js`
+- `actualStartAt`, `actualEndAt` mezők (valós kezdés / befejezés tárolása).
+- `startAt`, `endAt` továbbra is “scheduled” időpontok.
+
+---
+
+## Manuális tesztek (Postman/REST kliens)
+
+### A) Ütemezés reset + schedule újra
+1. `PATCH /api/matches/group/:groupId/schedule/reset`
+2. `POST /api/matches/group/:groupId/schedule` JSON body-val
+3. `GET /api/matches/group/:groupId` ellenőrzés: startAt/endAt/courtNumber kitöltve
+
+### B) Meccs indítás
+1. `GET /api/matches/group/:groupId` -> kimásolni egy `_id`-t
+2. `PATCH /api/matches/:matchId/status` body: `{ "status": "running" }`
+3. Várt: `actualStartAt` kitöltve, status=running
+
+### C) Eredmény rögzítés + módosítás
+1. `PATCH /api/matches/:matchId/result` body: `{ "sets": [...] }`
+2. Várt: status=finished, winner kitöltve, actualEndAt kitöltve
+3. Ugyanarra a meccsre újra: `PATCH /api/matches/:matchId/result` más sets-szel
+4. Várt: sets felülíródik, winner újraszámolódik
+
+---
+
+## Készen van
+- Group round-robin generálás
+- Scheduler (ütemezés) + reset
+- Státusz váltás (pending/running) + actualStartAt
+- Eredmény rögzítés (finished) + actualEndAt
+- Utólagos eredmény módosítás működik a result endpointon keresztül
+
+## Következő potenciális lépcsőfok (javaslat)
+1) **Státusz modell finomítás**
+  - Pl. `pending -> running -> finished`, plusz opcionális `paused` vagy `void/invalid` (ha kell).
+2) **Jogosultság / audit**
+  - Ki módosította az eredményt? (admin / bíró)
+  - Eredménymódosítás naplózása (history).
+3) **Group standings / tabella**
+  - Győzelem/vereség, szettarány, pontarány, rangsorolás.
+4) **Frontend integráció**
+  - API hívások stabil UI-val: schedule/reset/start/finish/edit result.

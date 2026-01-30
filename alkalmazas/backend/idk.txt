@@ -585,3 +585,159 @@ Response file saved.
 > 2026-01-29T100846.201.json
 
 Response code: 201 (Created); Time: 81ms (81 ms); Content length: 201 bytes (201 B)
+
+
+
+/////////////////////////////////////////////////////////////
+GET http://localhost:5000/api/tournaments
+
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 389
+ETag: W/"185-TkfB8IBkW4sNt72iPjW6PuJT6Ds"
+Date: Fri, 30 Jan 2026 08:01:02 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+[
+  {
+    "_id": "697c62083bfe29851df4ebca",
+    "name": "Verseny 1",
+    "location": "Kocsér",
+    "status": "draft",
+    "config": {
+      "estimatedMatchMinutes": 35,
+      "minRestPlayerMinutes": 20,
+      "minRestRefereeMinutes": 10,
+      "courtsCount": 1,
+      "avoidSameClubEarly": false,
+      "matchRules": {
+        "bestOf": 3,
+        "pointsToWin": 21,
+        "winBy": 2,
+        "cap": 30
+      }
+    },
+    "referees": [],
+    "createdAt": "2026-01-30T07:47:20.869Z",
+    "updatedAt": "2026-01-30T07:47:20.869Z",
+    "__v": 0
+  }
+]
+Response file saved.
+> 2026-01-30T090102.200.json
+
+Response code: 200 (OK); Time: 20ms (20 ms); Content length: 388 bytes (388 B)
+
+
+/////////////////////////////////////////
+GET http://localhost:5000/api/categories?tournamentId=697c62083bfe29851df4ebca
+
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 272
+ETag: W/"110-JTiY9yvCmYk7TpdWYrqrbB2dDnU"
+Date: Fri, 30 Jan 2026 08:01:41 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+[
+  {
+    "_id": "697c62243bfe29851df4ebcd",
+    "tournamentId": "697c62083bfe29851df4ebca",
+    "name": "2004 Fiú Egyéni",
+    "gender": "other",
+    "format": "group+playoff",
+    "groupsCount": 2,
+    "qualifiersPerGroup": 4,
+    "createdAt": "2026-01-30T07:47:48.561Z",
+    "updatedAt": "2026-01-30T07:47:48.561Z",
+    "__v": 0
+  }
+]
+Response file saved.
+> 2026-01-30T090141.200.json
+
+Response code: 200 (OK); Time: 28ms (28 ms); Content length: 270 bytes (270 B)
+
+
+
+/////////////////////////////////////////////
+GET http://localhost:5000/api/players?tournamentId=697c62083bfe29851df4ebca
+
+HTTP/1.1 200 OK
+X-Powered-By: Express
+Content-Type: application/json; charset=utf-8
+Content-Length: 1225
+ETag: W/"4c9-FJR5vZpSaLAFmG2udrHlzKcCDcg"
+Date: Fri, 30 Jan 2026 08:02:46 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+[
+  {
+    "_id": "697c659f8c9b78f43213583f",
+    "tournamentId": "697c62083bfe29851df4ebca",
+    "name": "Player 6",
+    "club": "Kecskemét SE",
+    "createdAt": "2026-01-30T08:02:39.551Z",
+    "updatedAt": "2026-01-30T08:02:39.551Z",
+    "__v": 0
+  },
+  {
+    "_id": "697c659d8c9b78f43213583c",
+    "tournamentId": "697c62083bfe29851df4ebca",
+    "name": "Player 5",
+    "club": "Kecskemét SE",
+    "createdAt": "2026-01-30T08:02:37.332Z",
+    "updatedAt": "2026-01-30T08:02:37.332Z",
+    "__v": 0
+  },
+  {
+    "_id": "697c659a8c9b78f432135839",
+    "tournamentId": "697c62083bfe29851df4ebca",
+    "name": "Player 4",
+    "club": "Kecskemét SE",
+    "createdAt": "2026-01-30T08:02:34.994Z",
+    "updatedAt": "2026-01-30T08:02:34.994Z",
+    "__v": 0
+  },
+  {
+    "_id": "697c65978c9b78f432135836",
+    "tournamentId": "697c62083bfe29851df4ebca",
+    "name": "Player 3",
+    "club": "Kecskemét SE",
+    "createdAt": "2026-01-30T08:02:31.065Z",
+    "updatedAt": "2026-01-30T08:02:31.065Z",
+    "__v": 0
+  },
+  {
+    "_id": "697c65938c9b78f432135833",
+    "tournamentId": "697c62083bfe29851df4ebca",
+    "name": "Player 2",
+    "club": "Kecskemét SE",
+    "createdAt": "2026-01-30T08:02:27.844Z",
+    "updatedAt": "2026-01-30T08:02:27.844Z",
+    "__v": 0
+  },
+  {
+    "_id": "697c64aa8c9b78f43213582e",
+    "tournamentId": "697c62083bfe29851df4ebca",
+    "name": "Player 1",
+    "club": "Kecskemét SE",
+    "createdAt": "2026-01-30T07:58:34.223Z",
+    "updatedAt": "2026-01-30T07:58:34.223Z",
+    "__v": 0
+  }
+]
+Response file saved.
+> 2026-01-30T090246.200.json
+
+Response code: 200 (OK); Time: 30ms (30 ms); Content length: 1219 bytes (1,22 kB)
+
+
+//////////
+
+697c7f4ce1128dfc81f43748
