@@ -383,9 +383,9 @@ router.post('/:groupId/playoff', async (req, res) => {
         if (!m.winner) return true;
 
         const type = m.resultType ?? 'played';
-        if (type === 'played' && (!Array.isArray(m.sets) || m.sets.length < 2)) return true;
+        return type === 'played' && (!Array.isArray(m.sets) || m.sets.length < 2);
 
-        return false;
+
     });
 
     if (unfinished.length > 0) {
