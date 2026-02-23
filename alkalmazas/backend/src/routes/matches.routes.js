@@ -55,31 +55,49 @@ router.post('/group/:groupId', async (req, res) => {
         const group = await Group.findById(req.params.groupId);
         if (!group) return res.status(404).json({ error: 'Group not found' });
 
-        // védelem: ne generáljon duplikáltan
         const existing = await Match.findOne({ groupId: group._id, round: 'group' });
-        if (existing) {
-            return res.status(409).json({ error: 'Group matches already generated for this group' });
-        }
+        if (existing) return res.status(409).json({ error: 'Group matches already generated for this group' });
 
-        const rawMatches = generateRoundRobinPairs(group.players);
+        const category = await Category.findById(group.categoryId).lean();
+        if (!category) return res.status(404).json({ error: 'Category not found' });
+
+        const n = group.players.length;
+        if (n < 2) return res.status(400).json({ error: 'Need at least 2 players in group' });
+
+        const requested = Number(req.body?.matchesPerPlayer);
+        const cfg = Number(category.groupStageMatchesPerPlayer);
+        const m = Number.isFinite(requested) && requested > 0
+            ? requested
+            : (Number.isFinite(cfg) && cfg > 0 ? cfg : recommendMatchesPerPlayer(n));
+
+        const rawMatches = generatePartialRoundRobin(group.players, m);
 
         const matches = await Match.insertMany(
-            rawMatches.map(m => ({
-                ...m,
-                groupId: group._id,
-                tournamentId: group.tournamentId,
-                categoryId: group.categoryId,
-                round: 'group',
-                status: 'pending',
-                courtNumber: null,
-                startAt: null,
-                endAt: null,
-                sets: [],
-                winner: null
-            }))
+            rawMatches.map(m => {
+                const a = String(m.player1);
+                const b = String(m.player2);
+                const pairKey = a < b ? `${a}_${b}` : `${b}_${a}`;
+
+                return {
+                    ...m,
+                    pairKey,
+                    groupId: group._id,
+                    tournamentId: group.tournamentId,
+                    categoryId: group.categoryId,
+                    round: 'group',
+                    status: 'pending',
+                    resultType: 'played',
+                    voided: false,
+                    courtNumber: null,
+                    startAt: null,
+                    endAt: null,
+                    sets: [],
+                    winner: null
+                };
+            })
         );
 
-        res.status(201).json(matches);
+        res.status(201).json({ generated: matches.length, matches });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -181,6 +199,42 @@ router.patch('/:matchId/result', async (req, res) => {
 
     match.status = 'finished';
 
+    match.resultType = 'played';
+    await match.save();
+
+    const populated = await Match.findById(match._id)
+        .populate('player1', 'name')
+        .populate('player2', 'name')
+        .populate('winner', 'name');
+
+    res.json(populated);
+});
+
+
+
+router.patch('/:matchId/outcome', async (req, res) => {
+    const { type, winnerSide } = req.body ?? {};
+    if (!['wo', 'ff', 'ret'].includes(type)) {
+        return res.status(400).json({ error: 'type must be wo | ff | ret' });
+    }
+    if (!['player1', 'player2'].includes(winnerSide)) {
+        return res.status(400).json({ error: 'winnerSide must be player1 | player2' });
+    }
+
+    const match = await Match.findById(req.params.matchId);
+    if (!match) return res.status(404).json({ error: 'Match not found' });
+
+    const winner = winnerSide === 'player1' ? match.player1 : match.player2;
+
+    match.sets = [];              // nincs 21-0, nincs 2-0
+    match.winner = winner;
+    match.resultType = type;
+
+    if (!match.actualStartAt) match.actualStartAt = new Date();
+    if (!match.actualEndAt) match.actualEndAt = new Date();
+    match.resultUpdatedAt = new Date();
+    match.status = 'finished';
+
     await match.save();
 
     const populated = await Match.findById(match._id)
@@ -252,12 +306,17 @@ router.post('/group/:groupId/schedule', async (req, res) => {
             return res.status(400).json({ error: 'courtTurnoverMinutes must be between 0 and 120' });
         }
 
-        const filter = { groupId: req.params.groupId, round: 'group', status: 'pending' };
+        const filter = {
+            groupId: req.params.groupId,
+            round: 'group',
+            status: 'pending',
+            voided: { $ne: true }
+        };
         if (!force) filter.startAt = null;
 
         const toSchedule = await Match.find(filter)
             .select('_id player1 player2 createdAt')
-            .sort({ createdAt: 1 })
+            .sort({ roundNumber: 1, createdAt: 1 })
             .lean();
 
         if (toSchedule.length === 0) {
@@ -306,7 +365,7 @@ router.patch('/group/:groupId/schedule/reset', async (req, res) => {
         const groupId = req.params.groupId;
 
         // Csak group stage meccsek
-        const filter = { groupId, round: 'group', status: 'pending' };
+        const filter = { groupId, round: 'group', status: 'pending', voided: { $ne: true } };
 
         const result = await Match.updateMany(filter, {
             $set: {
