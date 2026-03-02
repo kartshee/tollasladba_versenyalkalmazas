@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import Match from '../models/Match.js';
 import Group from '../models/Group.js';
-import { generateRoundRobinPairs } from '../services/roundRobin.service.js';
+import Category from '../models/Category.js';
+import { generatePartialRoundRobin, recommendMatchesPerPlayer } from '../services/roundRobin.service.js';
 import { isValidSet, determineMatchWinner } from '../services/badmintonRules.service.js';
 import { buildSchedule } from '../services/scheduler.service.js';
 
@@ -69,6 +70,15 @@ router.post('/group/:groupId', async (req, res) => {
         const m = Number.isFinite(requested) && requested > 0
             ? requested
             : (Number.isFinite(cfg) && cfg > 0 ? cfg : recommendMatchesPerPlayer(n));
+
+        if (n % 2 === 1 && m < (n - 1) && (m % 2 === 1)) {
+            return res.status(400).json({
+                error: "Odd player count with partial round robin requires even matchesPerPlayer (or use full RR with matchesPerPlayer=n-1).",
+                playersCount: n,
+                matchesPerPlayer: m
+            });
+        }
+
 
         const rawMatches = generatePartialRoundRobin(group.players, m);
 
