@@ -9,7 +9,7 @@ dotenv.config();
 
 async function main() {
   if (!process.env.MONGO_URI) {
-    console.error('Missing MONGO_URI in environment (.env)');
+    console.error('Missing MONGO_URI in environment (..env)');
     process.exit(1);
   }
 

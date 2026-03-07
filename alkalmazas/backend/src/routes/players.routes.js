@@ -4,16 +4,15 @@ import Player from '../models/Player.js';
 import Tournament from '../models/Tournament.js';
 
 const router = Router();
-
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 /**
  * ÚJ PLAYER LÉTREHOZÁSA (tournament-scoped)
- * body: { tournamentId, name, club? }
+ * body: { tournamentId, categoryId?, name, club?, note? }
  */
 router.post('/', async (req, res) => {
     try {
-        const { tournamentId, name, club } = req.body;
+        const { tournamentId, categoryId, name, club, note } = req.body;
 
         if (!tournamentId || !isValidId(tournamentId)) {
             return res.status(400).json({ error: 'Invalid tournamentId' });
@@ -25,15 +24,19 @@ router.post('/', async (req, res) => {
         const t = await Tournament.findById(tournamentId);
         if (!t) return res.status(404).json({ error: 'Tournament not found' });
 
-        // Draft lock – konzisztens a tournament routes-szal
+        // Draft lock
         if (t.status !== 'draft') {
             return res.status(409).json({ error: 'Tournament is not editable unless status=draft' });
         }
 
         const player = await Player.create({
             tournamentId,
+            categoryId: categoryId ?? null,
             name: name.trim(),
-            club: typeof club === 'string' ? club.trim() : ''
+            club: typeof club === 'string' ? club.trim() : '',
+            note: typeof note === 'string' ? note.trim() : '',
+            checkedInAt: null,
+            mainEligibility: 'main'
         });
 
         res.status(201).json(player);
@@ -44,10 +47,11 @@ router.post('/', async (req, res) => {
 
 /**
  * PLAYER LISTÁZÁS
- * opcionális: ?tournamentId=...
+ * opcionális: ?tournamentId=...  ?categoryId=...
  */
 router.get('/', async (req, res) => {
     const filter = {};
+
     if (req.query.tournamentId) {
         if (!isValidId(req.query.tournamentId)) {
             return res.status(400).json({ error: 'Invalid tournamentId' });
@@ -55,8 +59,38 @@ router.get('/', async (req, res) => {
         filter.tournamentId = req.query.tournamentId;
     }
 
+    if (req.query.categoryId) {
+        if (!isValidId(req.query.categoryId)) {
+            return res.status(400).json({ error: 'Invalid categoryId' });
+        }
+        filter.categoryId = req.query.categoryId;
+    }
+
     const players = await Player.find(filter).sort({ createdAt: -1 });
     res.json(players);
+});
+
+/**
+ * CHECK-IN toggle
+ * PATCH /api/players/:playerId/checkin
+ * body: { checkedIn: true|false }
+ */
+router.patch('/:playerId/checkin', async (req, res) => {
+    const { playerId } = req.params;
+    if (!isValidId(playerId)) return res.status(400).json({ error: 'Invalid playerId' });
+
+    const { checkedIn } = req.body ?? {};
+    if (checkedIn !== true && checkedIn !== false) {
+        return res.status(400).json({ error: 'checkedIn must be true or false' });
+    }
+
+    const player = await Player.findById(playerId);
+    if (!player) return res.status(404).json({ error: 'Player not found' });
+
+    player.checkedInAt = checkedIn ? new Date() : null;
+    await player.save();
+
+    res.json(player);
 });
 
 export default router;

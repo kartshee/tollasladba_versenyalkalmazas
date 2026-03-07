@@ -188,6 +188,8 @@ async function main() {
     force: true
   });
 
+  console.log('SCHEDULE RESPONSE:', sch);
+
   assert(typeof sch.scheduled === 'number');
   assert(Array.isArray(sch.matches));
   assert.equal(sch.scheduled, gen.generated, 'scheduled count must equal generated');

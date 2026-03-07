@@ -2,6 +2,7 @@ import { Router } from 'express';
 import Match from '../models/Match.js';
 import Group from '../models/Group.js';
 import Category from '../models/Category.js';
+import Player from '../models/Player.js';
 import { generatePartialRoundRobin, recommendMatchesPerPlayer } from '../services/roundRobin.service.js';
 import { isValidSet, determineMatchWinner } from '../services/badmintonRules.service.js';
 import { buildSchedule } from '../services/scheduler.service.js';
@@ -10,9 +11,6 @@ const router = Router();
 
 /**
  * Meccsek listázása (query paraméterekkel)
- * Példák:
- *  - /api/matches?tournamentId=...&status=running
- *  - /api/matches?tournamentId=...&status=pending&round=group
  */
 router.get('/', async (req, res) => {
     const { tournamentId, groupId, categoryId, status, round } = req.query;
@@ -48,8 +46,6 @@ router.get('/group/:groupId', async (req, res) => {
 
 /**
  * Meccsek generálása egy groupból (round robin)
- * - feltölti: tournamentId, categoryId, groupId
- * - status: pending
  */
 router.post('/group/:groupId', async (req, res) => {
     try {
@@ -79,7 +75,6 @@ router.post('/group/:groupId', async (req, res) => {
             });
         }
 
-
         const rawMatches = generatePartialRoundRobin(group.players, m);
 
         const matches = await Match.insertMany(
@@ -96,6 +91,8 @@ router.post('/group/:groupId', async (req, res) => {
                     categoryId: group.categoryId,
                     round: 'group',
                     status: 'pending',
+                    roundNumber: m.roundNumber ?? null,
+                    drawVersion: 1,
                     resultType: 'played',
                     voided: false,
                     courtNumber: null,
@@ -115,8 +112,6 @@ router.post('/group/:groupId', async (req, res) => {
 
 /**
  * Match státusz állítás (MVP)
- * PATCH /api/matches/:matchId/status
- * body: { "status": "running" | "pending" }
  */
 router.patch('/:matchId/status', async (req, res) => {
     if (!req.is('application/json')) {
@@ -162,9 +157,6 @@ router.patch('/:matchId/status', async (req, res) => {
 
 /**
  * Teljes meccs eredmény rögzítése (szettekkel)
- * - validál
- * - winner meghatároz
- * - státusz: finished
  */
 router.patch('/:matchId/result', async (req, res) => {
     const { sets } = req.body ?? {};
@@ -184,12 +176,6 @@ router.patch('/:matchId/result', async (req, res) => {
     const match = await Match.findById(req.params.matchId);
     if (!match) return res.status(404).json({ error: 'Match not found' });
 
-    // opcionális: csak akkor engedjük, ha legalább running/finished
-    // (ha te akarod, hogy pendingből is lehessen direkt eredményt rögzíteni, ezt vedd ki)
-    // if (match.status === 'pending' && !match.actualStartAt) {
-    //   return res.status(409).json({ error: 'Match is pending; start it first or allow direct result entry' });
-    // }
-
     const winner = determineMatchWinner(sets, match.player1, match.player2);
     if (!winner) {
         return res.status(400).json({ error: 'No winner determined (need 2 won sets)' });
@@ -198,18 +184,13 @@ router.patch('/:matchId/result', async (req, res) => {
     match.sets = sets;
     match.winner = winner;
 
-    // ha még nem indult ténylegesen, most tekintjük indulásnak
     if (!match.actualStartAt) match.actualStartAt = new Date();
-
-    // ha még nem volt "befejezés", most zárjuk le; ha már volt, ne írjuk felül az eredeti befejezést
     if (!match.actualEndAt) match.actualEndAt = new Date();
-
-    // audit: mikor írták át utoljára a pontszámot
     match.resultUpdatedAt = new Date();
 
     match.status = 'finished';
-
     match.resultType = 'played';
+
     await match.save();
 
     const populated = await Match.findById(match._id)
@@ -219,8 +200,6 @@ router.patch('/:matchId/result', async (req, res) => {
 
     res.json(populated);
 });
-
-
 
 router.patch('/:matchId/outcome', async (req, res) => {
     const { type, winnerSide } = req.body ?? {};
@@ -236,7 +215,7 @@ router.patch('/:matchId/outcome', async (req, res) => {
 
     const winner = winnerSide === 'player1' ? match.player1 : match.player2;
 
-    match.sets = [];              // nincs 21-0, nincs 2-0
+    match.sets = [];
     match.winner = winner;
     match.resultType = type;
 
@@ -255,20 +234,8 @@ router.patch('/:matchId/outcome', async (req, res) => {
     res.json(populated);
 });
 
-
-
 /**
  * Scheduler (MVP) - group meccsek ütemezése
- * POST /api/matches/group/:groupId/schedule
- * body:
- *  {
- *    "startAt": "2026-02-01T09:00:00.000Z",
- *    "courtsCount": 5,
- *    "matchMinutes": 35,
- *    "playerRestMinutes": 20,
- *    "courtTurnoverMinutes": 0,
- *    "force": true
- *  }
  */
 router.post('/group/:groupId/schedule', async (req, res) => {
     try {
@@ -287,7 +254,7 @@ router.post('/group/:groupId/schedule', async (req, res) => {
             matchMinutes,
             playerRestMinutes,
             courtTurnoverMinutes,
-            breakMinutes, // legacy alias
+            breakMinutes,
             force
         } = req.body;
 
@@ -299,7 +266,6 @@ router.post('/group/:groupId/schedule', async (req, res) => {
         const cCount = Number(courtsCount ?? 1);
         const mMin = Number(matchMinutes ?? 35);
 
-        // fallback: ha playerRestMinutes nincs, akkor breakMinutes-t használjuk
         const restMin = Number(playerRestMinutes ?? breakMinutes ?? 20);
         const turnoverMin = Number(courtTurnoverMinutes ?? 0);
 
@@ -333,7 +299,30 @@ router.post('/group/:groupId/schedule', async (req, res) => {
             return res.json({ scheduled: 0, message: 'No matches to schedule with current filter' });
         }
 
-        const plan = buildSchedule(toSchedule, {
+        // --- NEW: csak checked-in + MAIN eligible meccsek ---
+        const ids = new Set();
+        toSchedule.forEach(m => { ids.add(String(m.player1)); ids.add(String(m.player2)); });
+
+        const players = await Player.find({ _id: { $in: Array.from(ids) } })
+            .select('_id checkedInAt mainEligibility')
+            .lean();
+
+        const ok = new Set(
+            players
+                .filter(p => p.checkedInAt && p.mainEligibility === 'main')
+                .map(p => String(p._id))
+        );
+
+        const filtered = toSchedule.filter(m => ok.has(String(m.player1)) && ok.has(String(m.player2)));
+
+        if (filtered.length === 0) {
+            return res.json({
+                scheduled: 0,
+                message: 'No schedulable matches: require both players checked-in and main-eligible'
+            });
+        }
+
+        const plan = buildSchedule(filtered, {
             startAt: parsedStart,
             courtsCount: cCount,
             matchMinutes: mMin,
@@ -362,19 +351,12 @@ router.post('/group/:groupId/schedule', async (req, res) => {
     }
 });
 
-
-
 /**
  * Ütemezés reset (MVP)
- * PATCH /api/matches/group/:groupId/schedule/reset
- * - alapból csak a PENDING group meccsek schedule mezőit nullázza
- * - nem nyúl running/finished meccsekhez
  */
 router.patch('/group/:groupId/schedule/reset', async (req, res) => {
     try {
         const groupId = req.params.groupId;
-
-        // Csak group stage meccsek
         const filter = { groupId, round: 'group', status: 'pending', voided: { $ne: true } };
 
         const result = await Match.updateMany(filter, {
@@ -394,6 +376,5 @@ router.patch('/group/:groupId/schedule/reset', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-
 
 export default router;
