@@ -195,8 +195,6 @@ async function main() {
     force: true
   });
 
-  console.log('SCHEDULE RESPONSE:', sch);
-
   assert(typeof sch.scheduled === 'number');
   assert(Array.isArray(sch.matches));
   assert.equal(sch.scheduled, gen.generated, 'scheduled count must equal generated');
@@ -224,8 +222,28 @@ async function main() {
   assert(Array.isArray(standings));
   assert.equal(standings.length, playersCount, 'standings must include all players');
 
+  const scheduledMatches = sch.matches.filter((m) => m.round === 'group' && m.voided !== true);
+  const roundNumbers = [...new Set(scheduledMatches.map((m) => Number(m.roundNumber)).filter(Number.isFinite))].sort((a, b) => a - b);
+  const courtCounts = scheduledMatches.reduce((acc, m) => {
+    const key = String(m.courtNumber ?? 'unknown');
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
+  const starts = scheduledMatches.map((m) => new Date(m.startAt).getTime()).filter(Number.isFinite);
+  const ends = scheduledMatches.map((m) => new Date(m.endAt).getTime()).filter(Number.isFinite);
+
   console.log('OK: e2e smoke passed (with invariants)');
-  console.log({ tournamentId: t._id, categoryId: c._id, groupId: g._id, generated: gen.generated });
+  console.log({
+    tournamentId: t._id,
+    categoryId: c._id,
+    groupId: g._id,
+    generated: gen.generated,
+    scheduled: sch.scheduled,
+    rounds: roundNumbers,
+    firstStartAt: starts.length ? new Date(Math.min(...starts)).toISOString() : null,
+    lastEndAt: ends.length ? new Date(Math.max(...ends)).toISOString() : null,
+    courtDistribution: courtCounts
+  });
 }
 
 main().catch((e) => {

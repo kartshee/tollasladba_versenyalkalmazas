@@ -14,10 +14,16 @@ import categoryOpsRoutes from './routes/categories.ops.routes.js';
 
 dotenv.config();
 
-mongoose
-    .connect(process.env.MONGO_URI)
-    .then(() => console.log('MongoDB connected'))
-    .catch((err) => console.error(err));
+export async function connectDb() {
+    const mongoUri = process.env.MONGO_URI;
+    if (!mongoUri) {
+        throw new Error('Missing MONGO_URI in environment');
+    }
+
+    mongoose.set('bufferCommands', false);
+    await mongoose.connect(mongoUri);
+    console.log('MongoDB connected');
+}
 
 const app = express();
 
@@ -39,7 +45,7 @@ app.use('/api/categories', categoryRoutes);      // CRUD
 app.use('/api/categories', categoryOpsRoutes);   // ops (players bulk, grace, finalize, close-grace, friendly)
 
 app.get('/health', (req, res) => {
-    res.send('OK');
+    res.json({ ok: true, dbReadyState: mongoose.connection.readyState });
 });
 
 export default app;
