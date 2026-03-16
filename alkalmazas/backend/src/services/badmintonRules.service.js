@@ -36,12 +36,16 @@ export function assertValidMatchRulesConfig(raw = {}) {
         throw new Error('config.matchRules.cap must be an integer >= 1');
     }
 
-    const rules = normalizeMatchRules(source);
-    if (rules.cap < rules.pointsToWin) {
+    const bestOf = source.bestOf !== undefined ? Number(source.bestOf) : DEFAULT_MATCH_RULES.bestOf;
+    const pointsToWin = source.pointsToWin !== undefined ? Number(source.pointsToWin) : DEFAULT_MATCH_RULES.pointsToWin;
+    const winBy = source.winBy !== undefined ? Number(source.winBy) : DEFAULT_MATCH_RULES.winBy;
+    const cap = source.cap !== undefined ? Number(source.cap) : DEFAULT_MATCH_RULES.cap;
+
+    if (cap < pointsToWin) {
         throw new Error('config.matchRules.cap must be greater than or equal to pointsToWin');
     }
 
-    return rules;
+    return normalizeMatchRules({ bestOf, pointsToWin, winBy, cap });
 }
 
 export function setsToWin(matchRules = DEFAULT_MATCH_RULES) {
