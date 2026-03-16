@@ -4,6 +4,7 @@ import Tournament from '../models/Tournament.js';
 import Player from '../models/Player.js';
 import Group from '../models/Group.js';
 import Match from '../models/Match.js';
+import { normalizeCategoryPayload } from '../services/configValidation.service.js';
 
 const router = Router();
 
@@ -18,7 +19,12 @@ router.post('/', async (req, res) => {
             return res.status(409).json({ error: 'Tournament is not editable unless status=draft' });
         }
 
-        const created = await Category.create(req.body);
+        const payload = {
+            ...normalizeCategoryPayload(req.body ?? {}, { partial: false }),
+            tournamentId
+        };
+
+        const created = await Category.create(payload);
         res.status(201).json(created);
     } catch (err) {
         res.status(400).json({ error: err.message });
@@ -52,8 +58,9 @@ router.patch('/:id', async (req, res) => {
         return res.status(409).json({ error: 'Tournament is not editable unless status=draft' });
     }
 
-    Object.assign(c, req.body);
     try {
+        const payload = normalizeCategoryPayload(req.body ?? {}, { partial: true });
+        Object.assign(c, payload);
         await c.save();
         res.json(c);
     } catch (err) {

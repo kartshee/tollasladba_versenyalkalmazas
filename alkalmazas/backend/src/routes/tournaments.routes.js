@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import Tournament from '../models/Tournament.js';
+import { normalizeTournamentPayload } from '../services/configValidation.service.js';
 
 const router = Router();
 
@@ -8,7 +9,8 @@ const router = Router();
  */
 router.post('/', async (req, res) => {
     try {
-        const created = await Tournament.create(req.body);
+        const payload = normalizeTournamentPayload(req.body ?? {}, { partial: false });
+        const created = await Tournament.create(payload);
         res.status(201).json(created);
     } catch (err) {
         res.status(400).json({ error: err.message });
@@ -43,10 +45,9 @@ router.patch('/:id', async (req, res) => {
         return res.status(409).json({ error: 'Tournament is not editable unless status=draft' });
     }
 
-    // allow partial updates
-    Object.assign(t, req.body);
-
     try {
+        const payload = normalizeTournamentPayload(req.body ?? {}, { partial: true });
+        Object.assign(t, payload);
         await t.save();
         res.json(t);
     } catch (err) {

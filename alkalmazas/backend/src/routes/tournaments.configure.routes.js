@@ -2,6 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import Tournament from '../models/Tournament.js';
 import Category from '../models/Category.js';
+import { normalizeTournamentPayload, normalizeCategoryPayload } from '../services/configValidation.service.js';
 
 const router = Router();
 
@@ -16,23 +17,20 @@ const router = Router();
 router.post('/configure', async (req, res) => {
     const { tournament, categories } = req.body ?? {};
 
-    if (!tournament?.name || typeof tournament.name !== 'string' || !tournament.name.trim()) {
-        return res.status(400).json({ error: 'tournament.name is required' });
-    }
-
-    const cats = Array.isArray(categories) ? categories : [];
-
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
-        const createdTournament = await Tournament.create([tournament], { session });
+        const tournamentPayload = normalizeTournamentPayload(tournament ?? {}, { partial: false });
+        const cats = Array.isArray(categories) ? categories : [];
+
+        const createdTournament = await Tournament.create([tournamentPayload], { session });
         const t = createdTournament[0];
 
         const createdCategories = [];
         for (const c of cats) {
             const payload = {
-                ...c,
+                ...normalizeCategoryPayload(c ?? {}, { partial: false }),
                 tournamentId: t._id
             };
             const created = await Category.create([payload], { session });

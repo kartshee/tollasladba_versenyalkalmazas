@@ -3,11 +3,23 @@ import Match from '../models/Match.js';
 import Group from '../models/Group.js';
 import Category from '../models/Category.js';
 import Player from '../models/Player.js';
+import Tournament from '../models/Tournament.js';
 import { generatePartialRoundRobin, recommendMatchesPerPlayer } from '../services/roundRobin.service.js';
-import { isValidSet, determineMatchWinner } from '../services/badmintonRules.service.js';
+import { determineMatchWinner, normalizeMatchRules, validateMatchResult } from '../services/badmintonRules.service.js';
 import { buildSchedule } from '../services/scheduler.service.js';
 
 const router = Router();
+
+async function loadTournamentMatchRules(tournamentId) {
+    const tournament = await Tournament.findById(tournamentId).select('config.matchRules').lean();
+    if (!tournament) {
+        return { tournament: null, rules: normalizeMatchRules() };
+    }
+    return {
+        tournament,
+        rules: normalizeMatchRules(tournament?.config?.matchRules ?? {})
+    };
+}
 
 function ensureMatchResultEditable(match, res) {
     if (match.voided) {
@@ -179,26 +191,30 @@ router.patch('/:matchId/status', async (req, res) => {
  */
 router.patch('/:matchId/result', async (req, res) => {
     const { sets } = req.body ?? {};
-    if (!Array.isArray(sets) || sets.length < 2 || sets.length > 3) {
-        return res.status(400).json({ error: 'Match must have 2 or 3 sets' });
-    }
-
-    for (const s of sets) {
-        if (typeof s.p1 !== 'number' || typeof s.p2 !== 'number') {
-            return res.status(400).json({ error: 'Set points must be numbers', set: s });
-        }
-        if (!isValidSet(s.p1, s.p2)) {
-            return res.status(400).json({ error: 'Invalid set score', set: s });
-        }
-    }
 
     const match = await Match.findById(req.params.matchId);
     if (!match) return res.status(404).json({ error: 'Match not found' });
     if (!ensureMatchResultEditable(match, res)) return;
 
-    const winner = determineMatchWinner(sets, match.player1, match.player2);
+    const { tournament, rules } = await loadTournamentMatchRules(match.tournamentId);
+    if (!tournament) return res.status(404).json({ error: 'Tournament not found for match' });
+
+    const validation = validateMatchResult(sets, rules);
+    if (!validation.ok) {
+        return res.status(400).json({
+            error: validation.error,
+            set: validation.set,
+            setIndex: validation.setIndex,
+            rules
+        });
+    }
+
+    const winner = determineMatchWinner(sets, match.player1, match.player2, rules);
     if (!winner) {
-        return res.status(400).json({ error: 'No winner determined (need 2 won sets)' });
+        return res.status(400).json({
+            error: `No winner determined (need ${Math.floor(rules.bestOf / 2) + 1} won set${rules.bestOf > 1 ? 's' : ''})`,
+            rules
+        });
     }
 
     match.sets = sets;
@@ -214,7 +230,7 @@ router.patch('/:matchId/result', async (req, res) => {
         .populate('player2', 'name')
         .populate('winner', 'name');
 
-    res.json(populated);
+    res.json({ ...populated.toObject(), appliedMatchRules: rules });
 });
 
 router.patch('/:matchId/outcome', async (req, res) => {
