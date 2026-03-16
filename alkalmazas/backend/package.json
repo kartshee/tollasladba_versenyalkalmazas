@@ -12,7 +12,9 @@
     "smoke:e2e": "node src/scripts/e2e_smoke.js",
     "smoke:withdraw": "node src/scripts/e2e_withdraw.js",
     "cleanup:smoke": "node src/scripts/cleanup_smoke.js",
-    "smoke:checkin": "node src/scripts/e2e_checkin_draw.js"
+    "smoke:checkin": "node src/scripts/e2e_checkin_draw.js",
+    "smoke:standings": "node src/scripts/e2e_standings_tiebreak.js",
+    "smoke:playoff": "node src/scripts/e2e_playoff_qualifiers.js"
   },
   "keywords": [],
   "author": "",

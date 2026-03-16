@@ -141,13 +141,20 @@ async function main() {
   for (let i = 1; i <= playersCount; i++) {
     const p = await j('POST', '/api/players', {
       tournamentId: t._id,
+      categoryId: c._id,
       name: `P${i}`,
       club: i % 2 === 0 ? 'B' : 'A'
     });
     pIds.push(p._id);
   }
 
-  // 4) Create group
+  // 4) Check in players (scheduler requires checked-in + main eligible)
+  for (const playerId of pIds) {
+    const checkedIn = await j('PATCH', `/api/players/${playerId}/checkin`, { checkedIn: true });
+    assert(checkedIn?.checkedInAt, `player ${playerId} should be checked in`);
+  }
+
+  // 5) Create group
   const g = await j('POST', '/api/groups', {
     tournamentId: t._id,
     categoryId: c._id,
@@ -156,7 +163,7 @@ async function main() {
   });
   assert(g?._id);
 
-  // 5) Generate matches
+  // 6) Generate matches
   const gen = await j('POST', `/api/matches/group/${g._id}`, { matchesPerPlayer });
   assert(typeof gen.generated === 'number');
   assert(Array.isArray(gen.matches));
@@ -164,7 +171,7 @@ async function main() {
   // RR invariants (DB inserted docs returned)
   assertRoundRobinInvariants({ matches: gen.matches, playerIds: pIds, m: matchesPerPlayer });
 
-  // 5b) Idempotency: second generate must 409 (no duplicates)
+  // 6b) Idempotency: second generate must 409 (no duplicates)
   let got409 = false;
   try {
     await j('POST', `/api/matches/group/${g._id}`, { matchesPerPlayer });
@@ -174,7 +181,7 @@ async function main() {
   }
   assert(got409, 'expected 409 when generating matches twice for same group');
 
-  // 6) Schedule
+  // 7) Schedule
   const matchMinutes = 35;
   const restMinutes = 20;
   const turnoverMinutes = 0;
@@ -203,7 +210,7 @@ async function main() {
     turnoverMinutes
   });
 
-  // 7) Finish one match as WO
+  // 8) Finish one match as WO
   const firstMatch = gen.matches[0];
   const finished = await j('PATCH', `/api/matches/${firstMatch._id}/outcome`, {
     type: 'wo',
@@ -212,7 +219,7 @@ async function main() {
   assert.equal(finished.status, 'finished');
   assert.equal(finished.resultType, 'wo');
 
-  // 8) Standings (must return all players)
+  // 9) Standings (must return all players)
   const standings = await j('GET', `/api/groups/${g._id}/standings`);
   assert(Array.isArray(standings));
   assert.equal(standings.length, playersCount, 'standings must include all players');

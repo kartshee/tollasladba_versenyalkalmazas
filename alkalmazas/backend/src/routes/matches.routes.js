@@ -9,6 +9,21 @@ import { buildSchedule } from '../services/scheduler.service.js';
 
 const router = Router();
 
+function ensureMatchResultEditable(match, res) {
+    if (match.voided) {
+        res.status(409).json({ error: 'Cannot modify a voided match' });
+        return false;
+    }
+    return true;
+}
+
+function finalizeMatchResult(match, now = new Date()) {
+    if (!match.actualStartAt) match.actualStartAt = now;
+    if (!match.actualEndAt) match.actualEndAt = now;
+    match.resultUpdatedAt = now;
+    match.status = 'finished';
+}
+
 /**
  * Meccsek listázása (query paraméterekkel)
  */
@@ -127,6 +142,10 @@ router.patch('/:matchId/status', async (req, res) => {
     const match = await Match.findById(req.params.matchId);
     if (!match) return res.status(404).json({ error: 'Match not found' });
 
+    if (match.voided) {
+        return res.status(409).json({ error: 'Cannot change status of a voided match' });
+    }
+
     if (match.status === 'finished') {
         return res.status(409).json({ error: 'Cannot change status of a finished match' });
     }
@@ -175,6 +194,7 @@ router.patch('/:matchId/result', async (req, res) => {
 
     const match = await Match.findById(req.params.matchId);
     if (!match) return res.status(404).json({ error: 'Match not found' });
+    if (!ensureMatchResultEditable(match, res)) return;
 
     const winner = determineMatchWinner(sets, match.player1, match.player2);
     if (!winner) {
@@ -183,13 +203,9 @@ router.patch('/:matchId/result', async (req, res) => {
 
     match.sets = sets;
     match.winner = winner;
-
-    if (!match.actualStartAt) match.actualStartAt = new Date();
-    if (!match.actualEndAt) match.actualEndAt = new Date();
-    match.resultUpdatedAt = new Date();
-
-    match.status = 'finished';
     match.resultType = 'played';
+
+    finalizeMatchResult(match);
 
     await match.save();
 
@@ -212,6 +228,7 @@ router.patch('/:matchId/outcome', async (req, res) => {
 
     const match = await Match.findById(req.params.matchId);
     if (!match) return res.status(404).json({ error: 'Match not found' });
+    if (!ensureMatchResultEditable(match, res)) return;
 
     const winner = winnerSide === 'player1' ? match.player1 : match.player2;
 
@@ -219,10 +236,7 @@ router.patch('/:matchId/outcome', async (req, res) => {
     match.winner = winner;
     match.resultType = type;
 
-    if (!match.actualStartAt) match.actualStartAt = new Date();
-    if (!match.actualEndAt) match.actualEndAt = new Date();
-    match.resultUpdatedAt = new Date();
-    match.status = 'finished';
+    finalizeMatchResult(match);
 
     await match.save();
 

@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import Category from '../models/Category.js';
 import Tournament from '../models/Tournament.js';
+import Player from '../models/Player.js';
+import Group from '../models/Group.js';
+import Match from '../models/Match.js';
 
 const router = Router();
 
@@ -67,6 +70,23 @@ router.delete('/:id', async (req, res) => {
     if (!t) return res.status(404).json({ error: 'Tournament not found' });
     if (t.status !== 'draft') {
         return res.status(409).json({ error: 'Tournament is not editable unless status=draft' });
+    }
+
+    const [playersCount, groupsCount, matchesCount] = await Promise.all([
+        Player.countDocuments({ categoryId: c._id }),
+        Group.countDocuments({ categoryId: c._id }),
+        Match.countDocuments({ categoryId: c._id })
+    ]);
+
+    if (playersCount > 0 || groupsCount > 0 || matchesCount > 0) {
+        return res.status(409).json({
+            error: 'Category cannot be deleted while related players, groups or matches exist',
+            related: {
+                players: playersCount,
+                groups: groupsCount,
+                matches: matchesCount
+            }
+        });
     }
 
     await c.deleteOne();

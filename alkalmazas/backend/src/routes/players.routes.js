@@ -2,6 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import Player from '../models/Player.js';
 import Tournament from '../models/Tournament.js';
+import Category from '../models/Category.js';
 
 const router = Router();
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -29,9 +30,25 @@ router.post('/', async (req, res) => {
             return res.status(409).json({ error: 'Tournament is not editable unless status=draft' });
         }
 
+        let normalizedCategoryId = null;
+        if (categoryId !== undefined && categoryId !== null && categoryId !== '') {
+            if (!isValidId(categoryId)) {
+                return res.status(400).json({ error: 'Invalid categoryId' });
+            }
+
+            const category = await Category.findById(categoryId).select('_id tournamentId');
+            if (!category) return res.status(404).json({ error: 'Category not found' });
+
+            if (String(category.tournamentId) !== String(tournamentId)) {
+                return res.status(400).json({ error: 'Category does not belong to tournament' });
+            }
+
+            normalizedCategoryId = category._id;
+        }
+
         const player = await Player.create({
             tournamentId,
-            categoryId: categoryId ?? null,
+            categoryId: normalizedCategoryId,
             name: name.trim(),
             club: typeof club === 'string' ? club.trim() : '',
             note: typeof note === 'string' ? note.trim() : '',

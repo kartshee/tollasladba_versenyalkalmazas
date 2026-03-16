@@ -15,16 +15,21 @@ const makePairKey = (a, b) => {
     return x < y ? `${x}_${y}` : `${y}_${x}`;
 };
 
-function computeStandings(groupPlayers, finishedMatches) {
+function createEmptyStat(player) {
+    return {
+        player,
+        wins: 0,
+        played: 0,
+        setDiff: 0,
+        pointDiff: 0
+    };
+}
+
+function buildStatsMap(groupPlayers, finishedMatches) {
     const stats = {};
+
     groupPlayers.forEach((p) => {
-        stats[p._id.toString()] = {
-            player: p,
-            wins: 0,
-            played: 0,
-            setDiff: 0,
-            pointDiff: 0
-        };
+        stats[String(p._id)] = createEmptyStat(p);
     });
 
     for (const m of finishedMatches) {
@@ -41,10 +46,11 @@ function computeStandings(groupPlayers, finishedMatches) {
         const type = m.resultType ?? 'played';
         const sets = Array.isArray(m.sets) ? m.sets : [];
 
-        // tie-break only for played with real sets
         if (type === 'played' && sets.length >= 2) {
-            let p1Set = 0, p2Set = 0;
-            let p1Pts = 0, p2Pts = 0;
+            let p1Set = 0;
+            let p2Set = 0;
+            let p1Pts = 0;
+            let p2Pts = 0;
 
             for (const s of sets) {
                 p1Pts += s.p1;
@@ -61,32 +67,130 @@ function computeStandings(groupPlayers, finishedMatches) {
         }
     }
 
-    const list = Object.values(stats);
+    return stats;
+}
 
-    return list.sort((a, b) => {
-        const winRateA = a.played > 0 ? a.wins / a.played : 0;
-        const winRateB = b.played > 0 ? b.wins / b.played : 0;
-        if (winRateB !== winRateA) return winRateB - winRateA;
-        if (b.wins !== a.wins) return b.wins - a.wins;
+function winRate(stat) {
+    return stat.played > 0 ? stat.wins / stat.played : 0;
+}
 
-        // 2 fős tie: head-to-head
-        const h2h = finishedMatches.find((m) => {
-            const x = String(m.player1), y = String(m.player2);
-            return (
-                (x === String(a.player._id) && y === String(b.player._id)) ||
-                (x === String(b.player._id) && y === String(a.player._id))
-            );
-        });
-        if (h2h?.winner) {
-            if (String(h2h.winner) === String(a.player._id)) return -1;
-            if (String(h2h.winner) === String(b.player._id)) return 1;
-        }
+function compareByPrimaryStats(a, b) {
+    const winRateDiff = winRate(b) - winRate(a);
+    if (winRateDiff !== 0) return winRateDiff;
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    return 0;
+}
 
-        if (b.setDiff !== a.setDiff) return b.setDiff - a.setDiff;
-        if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
+function compareBySetPointAndName(a, b) {
+    if (b.setDiff !== a.setDiff) return b.setDiff - a.setDiff;
+    if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
 
+    const nameA = String(a.player?.name ?? '');
+    const nameB = String(b.player?.name ?? '');
+    const byName = nameA.localeCompare(nameB, 'hu');
+    if (byName !== 0) return byName;
+
+    return String(a.player?._id).localeCompare(String(b.player?._id));
+}
+
+function groupByComparator(sortedItems, comparator) {
+    const groups = [];
+
+    for (const item of sortedItems) {
+        const last = groups[groups.length - 1];
+        if (!last || comparator(last[0], item) !== 0) groups.push([item]);
+        else last.push(item);
+    }
+
+    return groups;
+}
+
+function findHeadToHeadWinner(playerAId, playerBId, finishedMatches) {
+    const match = finishedMatches.find((m) => {
+        const x = String(m.player1);
+        const y = String(m.player2);
+        return (
+            (x === String(playerAId) && y === String(playerBId)) ||
+            (x === String(playerBId) && y === String(playerAId))
+        );
+    });
+
+    return match?.winner ? String(match.winner) : null;
+}
+
+function resolveTieBlock(entries, finishedMatches) {
+    if (entries.length <= 1) return [...entries];
+
+    if (entries.length === 2) {
+        const [a, b] = entries;
+        const winner = findHeadToHeadWinner(a.player._id, b.player._id, finishedMatches);
+        if (winner === String(a.player._id)) return [a, b];
+        if (winner === String(b.player._id)) return [b, a];
+        return [...entries].sort(compareBySetPointAndName);
+    }
+
+    const tiedPlayers = entries.map((entry) => entry.player);
+    const tiedIds = new Set(tiedPlayers.map((p) => String(p._id)));
+    const directMatches = finishedMatches.filter((m) => (
+        tiedIds.has(String(m.player1)) && tiedIds.has(String(m.player2))
+    ));
+
+    const miniStatsMap = buildStatsMap(tiedPlayers, directMatches);
+    const decorated = entries.map((entry) => ({
+        entry,
+        mini: miniStatsMap[String(entry.player._id)] ?? createEmptyStat(entry.player)
+    }));
+
+    decorated.sort((x, y) => {
+        const primary = compareByPrimaryStats(x.mini, y.mini);
+        if (primary !== 0) return primary;
+        if (y.mini.setDiff !== x.mini.setDiff) return y.mini.setDiff - x.mini.setDiff;
+        if (y.mini.pointDiff !== x.mini.pointDiff) return y.mini.pointDiff - x.mini.pointDiff;
         return 0;
     });
+
+    const grouped = groupByComparator(decorated, (x, y) => {
+        const primary = compareByPrimaryStats(x.mini, y.mini);
+        if (primary !== 0) return primary;
+        if (x.mini.setDiff !== y.mini.setDiff) return x.mini.setDiff - y.mini.setDiff;
+        if (x.mini.pointDiff !== y.mini.pointDiff) return x.mini.pointDiff - y.mini.pointDiff;
+        return 0;
+    });
+
+    const resolved = [];
+    for (const block of grouped) {
+        if (block.length === 1) {
+            resolved.push(block[0].entry);
+            continue;
+        }
+
+        if (block.length === 2) {
+            const pairResolved = resolveTieBlock(block.map((x) => x.entry), directMatches);
+            resolved.push(...pairResolved);
+            continue;
+        }
+
+        resolved.push(...block.map((x) => x.entry).sort(compareBySetPointAndName));
+    }
+
+    return resolved;
+}
+
+function computeStandings(groupPlayers, finishedMatches) {
+    const statsMap = buildStatsMap(groupPlayers, finishedMatches);
+    const list = Object.values(statsMap);
+
+    list.sort(compareByPrimaryStats);
+
+    const grouped = groupByComparator(list, compareByPrimaryStats);
+    const resolved = [];
+
+    for (const block of grouped) {
+        if (block.length === 1) resolved.push(block[0]);
+        else resolved.push(...resolveTieBlock(block, finishedMatches));
+    }
+
+    return resolved;
 }
 
 /**
@@ -361,7 +465,7 @@ router.get('/:groupId/playoff', async (req, res) => {
 });
 
 /**
- * Playoff generálása (top4 -> 2 elődöntő)
+ * Playoff generálása (config alapján: top2 -> final, top4 -> 2 elődöntő)
  */
 router.post('/:groupId/playoff', async (req, res) => {
     if (!isValidId(req.params.groupId)) {
@@ -370,6 +474,22 @@ router.post('/:groupId/playoff', async (req, res) => {
 
     const group = await Group.findById(req.params.groupId).populate('players');
     if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    const category = await Category.findById(group.categoryId)
+        .select('format qualifiersPerGroup');
+    if (!category) return res.status(404).json({ error: 'Category not found' });
+
+    if (category.format !== 'group+playoff') {
+        return res.status(400).json({ error: 'Category format does not allow playoff generation' });
+    }
+
+    const qualifiersPerGroup = Number(category.qualifiersPerGroup ?? 4);
+    if (![2, 4].includes(qualifiersPerGroup)) {
+        return res.status(400).json({
+            error: 'Unsupported qualifiersPerGroup. Currently supported values: 2 or 4',
+            qualifiersPerGroup
+        });
+    }
 
     // Csoportkör meccsek (voided meccseket nem vesszük figyelembe)
     const groupMatches = await Match.find({
@@ -384,8 +504,6 @@ router.post('/:groupId/playoff', async (req, res) => {
 
         const type = m.resultType ?? 'played';
         return type === 'played' && (!Array.isArray(m.sets) || m.sets.length < 2);
-
-
     });
 
     if (unfinished.length > 0) {
@@ -396,7 +514,6 @@ router.post('/:groupId/playoff', async (req, res) => {
         });
     }
 
-    // Nincs-e már playoff?
     const existingPlayoff = await Match.findOne({
         groupId: group._id,
         round: { $in: ['playoff_semi', 'playoff_final'] },
@@ -406,36 +523,78 @@ router.post('/:groupId/playoff', async (req, res) => {
         return res.status(409).json({ error: 'Playoff already generated for this group' });
     }
 
-    // Standingshez csak "valóban lezárt" meccsek kellenek (winner != null, voided != true)
     const finishedForStandings = groupMatches.filter((m) => !!m.winner);
-
     const standings = computeStandings(group.players, finishedForStandings);
 
-    // Ha bevezeted a withdrawals-t a Group modellbe: delete_results játékosokat kizárjuk
     const deleteSet = new Set(
         (group.withdrawals ?? [])
             .filter((w) => w.policy === 'delete_results')
             .map((w) => String(w.playerId))
     );
 
-    const top4 = standings
+    const qualified = standings
         .filter((x) => !deleteSet.has(String(x.player._id)))
-        .slice(0, 4)
-        .map((x) => x.player._id);
+        .slice(0, qualifiersPerGroup);
 
-    if (top4.length < 4) {
-        return res.status(400).json({ error: 'Need at least 4 eligible players for playoff' });
+    if (qualified.length < qualifiersPerGroup) {
+        return res.status(400).json({
+            error: `Need at least ${qualifiersPerGroup} eligible players for playoff`,
+            qualifiersPerGroup,
+            eligiblePlayers: qualified.length
+        });
     }
 
+    if (qualifiersPerGroup === 2) {
+        const [first, second] = qualified;
+
+        const final = await Match.create({
+            groupId: group._id,
+            tournamentId: group.tournamentId,
+            categoryId: group.categoryId,
+            player1: first.player._id,
+            player2: second.player._id,
+            pairKey: makePairKey(first.player._id, second.player._id),
+            round: 'playoff_final',
+            status: 'pending',
+            resultType: 'played',
+            sets: [],
+            winner: null,
+            courtNumber: null,
+            startAt: null,
+            endAt: null
+        });
+
+        const populatedFinal = await Match.findById(final._id)
+            .populate('player1', 'name')
+            .populate('player2', 'name')
+            .populate('winner', 'name');
+
+        return res.status(201).json({
+            groupId: group._id,
+            qualifiersPerGroup,
+            qualified: qualified.map((s) => ({
+                id: s.player._id,
+                name: s.player.name,
+                wins: s.wins,
+                setDiff: s.setDiff,
+                pointDiff: s.pointDiff
+            })),
+            playoff: {
+                semis: [],
+                final: populatedFinal
+            }
+        });
+    }
+
+    const qualifiedIds = qualified.map((x) => x.player._id);
     const created = await Match.insertMany([
         {
             groupId: group._id,
             tournamentId: group.tournamentId,
-            categoryId: group.categoryId,          // <-- KÖTELEZŐ
-            player1: top4[0],
-            player2: top4[3],
-            pairKey: makePairKey(top4[0], top4[3]),   // <-- EZ
-
+            categoryId: group.categoryId,
+            player1: qualifiedIds[0],
+            player2: qualifiedIds[3],
+            pairKey: makePairKey(qualifiedIds[0], qualifiedIds[3]),
             round: 'playoff_semi',
             status: 'pending',
             resultType: 'played',
@@ -448,11 +607,10 @@ router.post('/:groupId/playoff', async (req, res) => {
         {
             groupId: group._id,
             tournamentId: group.tournamentId,
-            categoryId: group.categoryId,          // <-- KÖTELEZŐ
-            player1: top4[1],
-            player2: top4[2],
-            pairKey: makePairKey(top4[1], top4[2]),
-
+            categoryId: group.categoryId,
+            player1: qualifiedIds[1],
+            player2: qualifiedIds[2],
+            pairKey: makePairKey(qualifiedIds[1], qualifiedIds[2]),
             round: 'playoff_semi',
             status: 'pending',
             resultType: 'played',
@@ -471,15 +629,15 @@ router.post('/:groupId/playoff', async (req, res) => {
 
     res.status(201).json({
         groupId: group._id,
-        top4: standings
-            .filter((s) => !deleteSet.has(String(s.player._id)))
-            .slice(0, 4)
-            .map((s) => ({
-                id: s.player._id,
-                name: s.player.name,
-                wins: s.wins
-            })),
-        playoff: { semis: semiFinals }
+        qualifiersPerGroup,
+        qualified: qualified.map((s) => ({
+            id: s.player._id,
+            name: s.player.name,
+            wins: s.wins,
+            setDiff: s.setDiff,
+            pointDiff: s.pointDiff
+        })),
+        playoff: { semis: semiFinals, final: null }
     });
 });
 
@@ -527,7 +685,7 @@ router.post('/:groupId/playoff/final', async (req, res) => {
 
         player1: semis[0].winner,
         player2: semis[1].winner,
-        pairKey: makePairKey(semis[0].winner, semis[1].winner),  // <-- EZ
+        pairKey: makePairKey(semis[0].winner, semis[1].winner),
 
         round: 'playoff_final',
         status: 'pending',
@@ -539,7 +697,12 @@ router.post('/:groupId/playoff/final', async (req, res) => {
         endAt: null
     });
 
-    res.status(201).json(final);
+    const populatedFinal = await Match.findById(final._id)
+        .populate('player1', 'name')
+        .populate('player2', 'name')
+        .populate('winner', 'name');
+
+    res.status(201).json(populatedFinal);
 });
 
 router.get('/:groupId/winner', async (req, res) => {
