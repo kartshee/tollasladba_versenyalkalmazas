@@ -1,23 +1,14 @@
 import assert from 'node:assert/strict';
+import { createAuthContext } from './_auth.js';
 
-const baseUrl = process.env.BASE_URL ?? 'http://localhost:5001';
+let j;
+
 const n = Number(process.argv[2] ?? 8);
 const m = Number(process.argv[3] ?? 5);
 
-async function j(method, path, body) {
-    const res = await fetch(`${baseUrl}${path}`, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined
-    });
-    const text = await res.text();
-    let data;
-    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-    if (!res.ok) throw new Error(`${method} ${path} -> ${res.status}: ${JSON.stringify(data)}`);
-    return data;
-}
-
 async function main() {
+    const auth = await createAuthContext('CHECKIN');
+    j = (method, path, body) => auth.j(method, path, body);
     // 1) Tournament
     const t = await j('POST', '/api/tournaments', {
         name: `CHECKIN ${new Date().toISOString()}`,

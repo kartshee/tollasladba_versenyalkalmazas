@@ -5,6 +5,7 @@ import Match from '../models/Match.js';
 import Player from '../models/Player.js';
 import Tournament from '../models/Tournament.js';
 import Category from '../models/Category.js';
+import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
 
 const router = Router();
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -14,6 +15,17 @@ const makePairKey = (a, b) => {
     const y = String(b);
     return x < y ? `${x}_${y}` : `${y}_${x}`;
 };
+
+
+async function loadOwnedGroup(groupId, userId, { populatePlayers = false } = {}) {
+    let query = Group.findById(groupId);
+    if (populatePlayers) query = query.populate('players');
+    const group = await query;
+    if (!group) return { group: null, tournament: null };
+    const tournament = await assertTournamentOwned(group.tournamentId, userId);
+    if (!tournament) return { group: null, tournament: null };
+    return { group, tournament };
+}
 
 function createEmptyStat(player) {
     return {
@@ -220,7 +232,7 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: 'Duplicate playerId in group' });
         }
 
-        const t = await Tournament.findById(tournamentId);
+        const t = await assertTournamentOwned(tournamentId, req.user._id);
         if (!t) return res.status(404).json({ error: 'Tournament not found' });
 
         if (t.status !== 'draft') {
@@ -273,7 +285,11 @@ router.get('/', async (req, res) => {
         if (!isValidId(req.query.tournamentId)) {
             return res.status(400).json({ error: 'Invalid tournamentId' });
         }
+        const t = await assertTournamentOwned(req.query.tournamentId, req.user._id, { lean: true });
+        if (!t) return res.json([]);
         filter.tournamentId = req.query.tournamentId;
+    } else {
+        filter.tournamentId = { $in: await getOwnedTournamentIds(req.user._id) };
     }
 
     if (req.query.categoryId) {
@@ -298,7 +314,7 @@ router.get('/:groupId/standings', async (req, res) => {
         return res.status(400).json({ error: 'Invalid groupId' });
     }
 
-    const group = await Group.findById(req.params.groupId).populate('players');
+    const { group } = await loadOwnedGroup(req.params.groupId, req.user._id, { populatePlayers: true });
     if (!group) return res.status(404).json({ error: 'Group not found' });
 
     const matches = await Match.find({
@@ -325,7 +341,7 @@ router.patch('/:groupId/withdraw', async (req, res) => {
             return res.status(400).json({ error: 'Invalid reason' });
         }
 
-        const group = await Group.findById(groupId);
+        const { group } = await loadOwnedGroup(groupId, req.user._id);
         if (!group) return res.status(404).json({ error: 'Group not found' });
 
         // játékos tényleg a groupban van?
@@ -443,6 +459,9 @@ router.get('/:groupId/playoff', async (req, res) => {
         return res.status(400).json({ error: 'Invalid groupId' });
     }
 
+    const { group: ownedPlayoffGroup } = await loadOwnedGroup(req.params.groupId, req.user._id);
+    if (!ownedPlayoffGroup) return res.status(404).json({ error: 'Group not found' });
+
     const semis = await Match.find({
         groupId: req.params.groupId,
         round: 'playoff_semi',
@@ -472,7 +491,7 @@ router.post('/:groupId/playoff', async (req, res) => {
         return res.status(400).json({ error: 'Invalid groupId' });
     }
 
-    const group = await Group.findById(req.params.groupId).populate('players');
+    const { group } = await loadOwnedGroup(req.params.groupId, req.user._id, { populatePlayers: true });
     if (!group) return res.status(404).json({ error: 'Group not found' });
 
     const category = await Category.findById(group.categoryId)
@@ -648,7 +667,7 @@ router.post('/:groupId/playoff/final', async (req, res) => {
     const groupId = req.params.groupId;
     if (!isValidId(groupId)) return res.status(400).json({ error: 'Invalid groupId' });
 
-    const group = await Group.findById(groupId).lean();
+    const { group } = await loadOwnedGroup(groupId, req.user._id);
     if (!group) return res.status(404).json({ error: 'Group not found' });
 
     const semis = await Match.find({
@@ -709,6 +728,9 @@ router.get('/:groupId/winner', async (req, res) => {
     if (!isValidId(req.params.groupId)) {
         return res.status(400).json({ error: 'Invalid groupId' });
     }
+
+    const { group: ownedWinnerGroup } = await loadOwnedGroup(req.params.groupId, req.user._id);
+    if (!ownedWinnerGroup) return res.status(404).json({ error: 'Group not found' });
 
     const final = await Match.findOne({
         groupId: req.params.groupId,

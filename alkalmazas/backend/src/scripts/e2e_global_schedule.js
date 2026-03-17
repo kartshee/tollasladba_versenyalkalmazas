@@ -1,26 +1,11 @@
 import assert from 'node:assert/strict';
+import { createAuthContext } from './_auth.js';
 
-const baseUrl = process.env.BASE_URL ?? 'http://localhost:5001';
+let j;
+
 const categoriesCount = Number(process.argv[2] ?? 5);
 const playersPerCategory = Number(process.argv[3] ?? 4);
 const courtsCount = Number(process.argv[4] ?? 9);
-
-async function j(method, path, body) {
-    const res = await fetch(`${baseUrl}${path}`, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined
-    });
-
-    const text = await res.text();
-    let data;
-    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-
-    if (!res.ok) {
-        throw new Error(`${method} ${path} -> ${res.status}: ${JSON.stringify(data)}`);
-    }
-    return data;
-}
 
 function idOf(x) {
     if (x && typeof x === 'object') return String(x._id ?? x.id ?? x);
@@ -98,6 +83,8 @@ async function createCategoryFlow(tournamentId, idx) {
 }
 
 async function main() {
+    const auth = await createAuthContext('GLOBAL');
+    j = (method, path, body) => auth.j(method, path, body);
     const t = await j('POST', '/api/tournaments', {
         name: `GLOBAL ${new Date().toISOString()}`,
         config: {

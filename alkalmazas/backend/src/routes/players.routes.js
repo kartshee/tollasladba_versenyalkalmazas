@@ -3,14 +3,11 @@ import mongoose from 'mongoose';
 import Player from '../models/Player.js';
 import Tournament from '../models/Tournament.js';
 import Category from '../models/Category.js';
+import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
 
 const router = Router();
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-/**
- * ÚJ PLAYER LÉTREHOZÁSA (tournament-scoped)
- * body: { tournamentId, categoryId?, name, club?, note? }
- */
 router.post('/', async (req, res) => {
     try {
         const { tournamentId, categoryId, name, club, note } = req.body;
@@ -22,10 +19,9 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: 'Name is required' });
         }
 
-        const t = await Tournament.findById(tournamentId);
+        const t = await assertTournamentOwned(tournamentId, req.user._id);
         if (!t) return res.status(404).json({ error: 'Tournament not found' });
 
-        // Draft lock
         if (t.status !== 'draft') {
             return res.status(409).json({ error: 'Tournament is not editable unless status=draft' });
         }
@@ -62,10 +58,6 @@ router.post('/', async (req, res) => {
     }
 });
 
-/**
- * PLAYER LISTÁZÁS
- * opcionális: ?tournamentId=...  ?categoryId=...
- */
 router.get('/', async (req, res) => {
     const filter = {};
 
@@ -73,7 +65,11 @@ router.get('/', async (req, res) => {
         if (!isValidId(req.query.tournamentId)) {
             return res.status(400).json({ error: 'Invalid tournamentId' });
         }
+        const t = await assertTournamentOwned(req.query.tournamentId, req.user._id, { lean: true });
+        if (!t) return res.json([]);
         filter.tournamentId = req.query.tournamentId;
+    } else {
+        filter.tournamentId = { $in: await getOwnedTournamentIds(req.user._id) };
     }
 
     if (req.query.categoryId) {
@@ -87,11 +83,6 @@ router.get('/', async (req, res) => {
     res.json(players);
 });
 
-/**
- * CHECK-IN toggle
- * PATCH /api/players/:playerId/checkin
- * body: { checkedIn: true|false }
- */
 router.patch('/:playerId/checkin', async (req, res) => {
     const { playerId } = req.params;
     if (!isValidId(playerId)) return res.status(400).json({ error: 'Invalid playerId' });
@@ -103,6 +94,9 @@ router.patch('/:playerId/checkin', async (req, res) => {
 
     const player = await Player.findById(playerId);
     if (!player) return res.status(404).json({ error: 'Player not found' });
+
+    const t = await Tournament.findOne({ _id: player.tournamentId, ownerId: req.user._id }).lean();
+    if (!t) return res.status(404).json({ error: 'Player not found' });
 
     player.checkedInAt = checkedIn ? new Date() : null;
     await player.save();

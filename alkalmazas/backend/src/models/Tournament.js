@@ -43,6 +43,7 @@ const refereeSchema = new mongoose.Schema(
 const tournamentSchema = new mongoose.Schema(
     {
             name: { type: String, required: true, trim: true },
+            ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
             date: Date,
             location: String,
 

@@ -6,14 +6,6 @@ import { normalizeTournamentPayload, normalizeCategoryPayload } from '../service
 
 const router = Router();
 
-/**
- * POST /api/tournaments/configure
- * body:
- * {
- *   "tournament": { ... Tournament fields ... },
- *   "categories": [ { ... Category fields without tournamentId ... }, ... ]
- * }
- */
 router.post('/configure', async (req, res) => {
     const { tournament, categories } = req.body ?? {};
 
@@ -24,7 +16,7 @@ router.post('/configure', async (req, res) => {
         const tournamentPayload = normalizeTournamentPayload(tournament ?? {}, { partial: false });
         const cats = Array.isArray(categories) ? categories : [];
 
-        const createdTournament = await Tournament.create([tournamentPayload], { session });
+        const createdTournament = await Tournament.create([{ ...tournamentPayload, ownerId: req.user._id }], { session });
         const t = createdTournament[0];
 
         const createdCategories = [];

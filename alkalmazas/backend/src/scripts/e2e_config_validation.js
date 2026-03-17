@@ -1,28 +1,12 @@
 import assert from 'node:assert/strict';
+import { createAuthContext } from './_auth.js';
 
-const baseUrl = process.env.BASE_URL ?? 'http://localhost:5001';
+let j;
 
-async function j(method, path, body, expectedStatus = null) {
-    const res = await fetch(`${baseUrl}${path}`, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined
-    });
-
-    const text = await res.text();
-    let data;
-    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-
-    if (expectedStatus !== null) {
-        assert.equal(res.status, expectedStatus, `${method} ${path} expected ${expectedStatus}, got ${res.status}: ${JSON.stringify(data)}`);
-        return data;
-    }
-
-    if (!res.ok) throw new Error(`${method} ${path} -> ${res.status}: ${JSON.stringify(data)}`);
-    return data;
-}
 
 async function main() {
+    const auth = await createAuthContext('CONFIG');
+    j = (method, path, body, expectedStatus = null) => auth.j(method, path, body, expectedStatus === null ? {} : { expectedStatus });
     const invalidTournament = await j('POST', '/api/tournaments', {
         name: `BAD-RULES-${Date.now()}`,
         config: {

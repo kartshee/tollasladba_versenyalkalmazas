@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { createAuthContext } from './_auth.js';
 
-const baseUrl = process.env.BASE_URL ?? 'http://localhost:5001';
+let j;
+
 
 const playersCount = Number(process.argv[2] ?? 8);
 const matchesPerPlayer = Number(process.argv[3] ?? 5);
@@ -11,30 +13,13 @@ function idOf(x) {
     return String(x);
 }
 
-async function j(method, path, body) {
-    const res = await fetch(`${baseUrl}${path}`, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: body ? JSON.stringify(body) : undefined
-    });
-
-    const text = await res.text();
-    let data;
-    try {
-        data = text ? JSON.parse(text) : null;
-    } catch {
-        data = text;
-    }
-
-    if (!res.ok) throw new Error(`${method} ${path} -> ${res.status}: ${JSON.stringify(data)}`);
-    return data;
-}
-
 function involves(mm, playerId) {
     return idOf(mm.player1) === String(playerId) || idOf(mm.player2) === String(playerId);
 }
 
 async function main() {
+    const auth = await createAuthContext('WITHDRAW');
+    j = (method, path, body) => auth.j(method, path, body);
     const stamp = new Date().toISOString();
 
     const t = await j('POST', '/api/tournaments', { name: `WITHDRAW ${stamp}` });

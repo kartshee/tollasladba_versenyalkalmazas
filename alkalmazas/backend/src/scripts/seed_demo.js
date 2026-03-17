@@ -4,6 +4,8 @@ import Tournament from '../models/Tournament.js';
 import Category from '../models/Category.js';
 import Player from '../models/Player.js';
 import Group from '../models/Group.js';
+import User from '../models/User.js';
+import { hashPassword } from '../services/auth.service.js';
 
 dotenv.config();
 
@@ -20,8 +22,16 @@ async function main() {
 
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 
+  const demoUser = await User.create({
+    name: 'Demo Admin',
+    email: `demo-${stamp}@example.com`,
+    passwordHash: await hashPassword('DemoPass123!'),
+    role: 'admin'
+  });
+
   const tournament = await Tournament.create({
     name: `DEMO Tournament ${stamp}`,
+    ownerId: demoUser._id,
     status: 'draft'
   });
 

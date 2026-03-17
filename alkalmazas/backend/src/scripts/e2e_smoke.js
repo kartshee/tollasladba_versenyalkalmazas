@@ -4,8 +4,10 @@ Run with:
 */
 
 import assert from 'node:assert/strict';
+import { createAuthContext } from './_auth.js';
 
-const baseUrl = process.env.BASE_URL ?? 'http://localhost:5001';
+let j;
+
 
 const playersCount = Number(process.argv[2] ?? 8);
 const matchesPerPlayer = Number(process.argv[3] ?? 5);
@@ -19,27 +21,6 @@ function pairKey(a, b) {
   const x = String(a);
   const y = String(b);
   return x < y ? `${x}_${y}` : `${y}_${x}`;
-}
-
-async function j(method, path, body) {
-  const res = await fetch(`${baseUrl}${path}`, {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined
-  });
-
-  const text = await res.text();
-  let data;
-  try {
-    data = text ? JSON.parse(text) : null;
-  } catch {
-    data = text;
-  }
-
-  if (!res.ok) {
-    throw new Error(`${method} ${path} -> ${res.status}: ${JSON.stringify(data)}`);
-  }
-  return data;
 }
 
 function assertRoundRobinInvariants({ matches, playerIds, m }) {
@@ -122,6 +103,8 @@ function assertScheduleInvariants({ matches, playerIds, matchMinutes, restMinute
 }
 
 async function main() {
+    const auth = await createAuthContext('SMOKE');
+    j = (method, path, body) => auth.j(method, path, body);
   // 1) Create tournament
   const stamp = new Date().toISOString();
   const t = await j('POST', '/api/tournaments', { name: `SMOKE ${stamp}` });

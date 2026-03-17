@@ -17,17 +17,21 @@
     "smoke:playoff": "node src/scripts/e2e_playoff_qualifiers.js",
     "smoke:rules": "node src/scripts/e2e_match_rules.js",
     "smoke:config": "node src/scripts/e2e_config_validation.js",
-    "smoke:all": "npm run selftest && npm run smoke:e2e && npm run smoke:checkin && npm run smoke:withdraw && npm run smoke:standings && npm run smoke:playoff && npm run smoke:global && npm run smoke:rules && npm run smoke:config",
+    "smoke:all": "npm run selftest && npm run smoke:auth && npm run smoke:e2e && npm run smoke:checkin && npm run smoke:withdraw && npm run smoke:standings && npm run smoke:playoff && npm run smoke:global && npm run smoke:rules && npm run smoke:config",
     "cleanup:smoke:apply": "node src/scripts/cleanup_smoke.js --apply",
-    "smoke:global": "node src/scripts/e2e_global_schedule.js"
+    "smoke:global": "node src/scripts/e2e_global_schedule.js",
+    "smoke:auth": "node src/scripts/e2e_auth_ownership.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.1.2"
   },
   "devDependencies": {

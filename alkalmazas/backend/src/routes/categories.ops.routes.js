@@ -5,6 +5,7 @@ import Player from '../models/Player.js';
 import Group from '../models/Group.js';
 import Match from '../models/Match.js';
 import { generatePartialRoundRobin, recommendMatchesPerPlayer } from '../services/roundRobin.service.js';
+import { assertTournamentOwned } from '../services/ownership.service.js';
 
 const router = Router();
 
@@ -13,6 +14,14 @@ const makePairKey = (a, b) => {
     const y = String(b);
     return x < y ? `${x}_${y}` : `${y}_${x}`;
 };
+
+async function loadOwnedCategory(categoryId, userId) {
+    const category = await Category.findById(categoryId);
+    if (!category) return { category: null, tournament: null };
+    const tournament = await assertTournamentOwned(category.tournamentId, userId);
+    if (!tournament) return { category: null, tournament: null };
+    return { category, tournament };
+}
 
 function getGraceMinutes(category, tournament) {
     const ov = category?.checkIn?.graceMinutesOverride;
@@ -35,17 +44,9 @@ function parseBulk(text) {
         .filter((x) => x.name);
 }
 
-/**
- * Add player to category (single)
- * POST /api/categories/:id/players
- * body: { name, club?, note? }
- */
 router.post('/:id/players', async (req, res) => {
-    const category = await Category.findById(req.params.id);
+    const { category, tournament: t } = await loadOwnedCategory(req.params.id, req.user._id);
     if (!category) return res.status(404).json({ error: 'Category not found' });
-
-    const t = await Tournament.findById(category.tournamentId);
-    if (!t) return res.status(404).json({ error: 'Tournament not found' });
     if (t.status === 'finished') return res.status(409).json({ error: 'Tournament finished' });
 
     const { name, club = '', note = '' } = req.body ?? {};
@@ -66,17 +67,9 @@ router.post('/:id/players', async (req, res) => {
     res.status(201).json(player);
 });
 
-/**
- * Add players to category (bulk paste)
- * POST /api/categories/:id/players/bulk
- * body: { text: "Name;Club;Note\nName2;Club2\nName3" }
- */
 router.post('/:id/players/bulk', async (req, res) => {
-    const category = await Category.findById(req.params.id);
+    const { category, tournament: t } = await loadOwnedCategory(req.params.id, req.user._id);
     if (!category) return res.status(404).json({ error: 'Category not found' });
-
-    const t = await Tournament.findById(category.tournamentId);
-    if (!t) return res.status(404).json({ error: 'Tournament not found' });
     if (t.status === 'finished') return res.status(409).json({ error: 'Tournament finished' });
 
     const { text } = req.body ?? {};
@@ -101,17 +94,9 @@ router.post('/:id/players/bulk', async (req, res) => {
     res.status(201).json({ created: created.length, players: created });
 });
 
-/**
- * Grace override
- * PATCH /api/categories/:id/checkin/grace
- * body: { graceMinutesOverride: number|null, reason: string }
- */
 router.patch('/:id/checkin/grace', async (req, res) => {
-    const category = await Category.findById(req.params.id);
+    const { category, tournament: t } = await loadOwnedCategory(req.params.id, req.user._id);
     if (!category) return res.status(404).json({ error: 'Category not found' });
-
-    const t = await Tournament.findById(category.tournamentId);
-    if (!t) return res.status(404).json({ error: 'Tournament not found' });
     if (t.status === 'finished') return res.status(409).json({ error: 'Tournament finished' });
 
     const { graceMinutesOverride, reason = '' } = req.body ?? {};
@@ -130,20 +115,14 @@ router.patch('/:id/checkin/grace', async (req, res) => {
     res.json(category);
 });
 
-/**
- * Finalize / Lock draw
- * POST /api/categories/:id/finalize-draw
- */
 router.post('/:id/finalize-draw', async (req, res) => {
-    const category = await Category.findById(req.params.id);
+    const { category, tournament: t } = await loadOwnedCategory(req.params.id, req.user._id);
     if (!category) return res.status(404).json({ error: 'Category not found' });
 
     if (['draw_locked', 'in_progress', 'completed'].includes(category.status)) {
         return res.status(409).json({ error: `Category already locked/in progress (${category.status})` });
     }
 
-    const t = await Tournament.findById(category.tournamentId);
-    if (!t) return res.status(404).json({ error: 'Tournament not found' });
     if (t.status === 'finished') return res.status(409).json({ error: 'Tournament finished' });
 
     const players = await Player.find({
@@ -193,7 +172,6 @@ router.post('/:id/finalize-draw', async (req, res) => {
         let m = Number.isFinite(cfg) && cfg > 0 ? cfg : recommendMatchesPerPlayer(n);
         m = Math.min(m, n - 1);
 
-        // odd n + odd m partial -> auto-correct lefelé + warning
         if (n % 2 === 1 && m < n - 1 && m % 2 === 1) {
             if (m - 1 >= 2) {
                 warnings.push({
@@ -217,31 +195,23 @@ router.post('/:id/finalize-draw', async (req, res) => {
             tournamentId: category.tournamentId,
             categoryId: category._id,
             groupId: g._id,
-
             player1: mm.player1,
             player2: mm.player2,
-
             pairKey: makePairKey(mm.player1, mm.player2),
-
             round: 'group',
             status: 'pending',
             roundNumber: mm.roundNumber ?? null,
-
             drawVersion,
-
             resultType: 'played',
             voided: false,
             voidReason: '',
             voidedAt: null,
-
             courtNumber: null,
             startAt: null,
             endAt: null,
-
             actualStartAt: null,
             actualEndAt: null,
             resultUpdatedAt: null,
-
             sets: [],
             winner: null
         }));
@@ -267,19 +237,11 @@ router.post('/:id/finalize-draw', async (req, res) => {
     });
 });
 
-/**
- * Close grace: void remaining (not checked-in) MAIN players' unplayed matches, move them to friendly_only.
- * POST /api/categories/:id/close-grace
- * body optional: { force: true }
- */
 router.post('/:id/close-grace', async (req, res) => {
-    const category = await Category.findById(req.params.id);
+    const { category, tournament: t } = await loadOwnedCategory(req.params.id, req.user._id);
     if (!category) return res.status(404).json({ error: 'Category not found' });
 
     if (!category.drawLockedAt) return res.status(400).json({ error: 'Category is not draw_locked yet' });
-
-    const t = await Tournament.findById(category.tournamentId);
-    if (!t) return res.status(404).json({ error: 'Tournament not found' });
     if (t.status === 'finished') return res.status(409).json({ error: 'Tournament finished' });
 
     const now = new Date();
@@ -359,13 +321,8 @@ router.post('/:id/close-grace', async (req, res) => {
     });
 });
 
-/**
- * Manual friendly match
- * POST /api/categories/:id/friendly-match
- * body: { player1Id, player2Id }
- */
 router.post('/:id/friendly-match', async (req, res) => {
-    const category = await Category.findById(req.params.id);
+    const { category } = await loadOwnedCategory(req.params.id, req.user._id);
     if (!category) return res.status(404).json({ error: 'Category not found' });
 
     const { player1Id, player2Id } = req.body ?? {};
@@ -374,6 +331,10 @@ router.post('/:id/friendly-match', async (req, res) => {
 
     const [p1, p2] = await Promise.all([Player.findById(player1Id), Player.findById(player2Id)]);
     if (!p1 || !p2) return res.status(404).json({ error: 'Player not found' });
+
+    if (String(p1.tournamentId) !== String(category.tournamentId) || String(p2.tournamentId) !== String(category.tournamentId)) {
+        return res.status(404).json({ error: 'Player not found' });
+    }
 
     if (String(p1.categoryId) !== String(category._id) || String(p2.categoryId) !== String(category._id)) {
         return res.status(400).json({ error: 'Players must belong to this category (MVP)' });
@@ -386,29 +347,23 @@ router.post('/:id/friendly-match', async (req, res) => {
         tournamentId: category.tournamentId,
         categoryId: category._id,
         groupId: null,
-
         player1: p1._id,
         player2: p2._id,
-
         pairKey,
         round: 'friendly',
         status: 'pending',
         roundNumber: null,
         drawVersion: 0,
-
         resultType: 'played',
         voided: false,
         voidReason: '',
         voidedAt: null,
-
         courtNumber: null,
         startAt: null,
         endAt: null,
-
         actualStartAt: null,
         actualEndAt: null,
         resultUpdatedAt: null,
-
         sets: [],
         winner: null
     });
