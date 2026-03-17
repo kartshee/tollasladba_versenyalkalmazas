@@ -21,6 +21,7 @@ const DEFAULT_PREFIX_PATTERNS = [
     /^TB-3WAY\s/i,
     /^TB-H2H\s/i,
     /^PLAYOFF\s/i,
+    /^GLOBAL\s/i,
     /^RULES-BO[15]-/i,
     /^BAD-RULES-/i,
     /^CONFIG-VALID-/i,

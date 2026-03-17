@@ -6,7 +6,7 @@ import Player from '../models/Player.js';
 import Tournament from '../models/Tournament.js';
 import { generatePartialRoundRobin, recommendMatchesPerPlayer } from '../services/roundRobin.service.js';
 import { determineMatchWinner, normalizeMatchRules, validateMatchResult } from '../services/badmintonRules.service.js';
-import { buildSchedule } from '../services/scheduler.service.js';
+import { buildGlobalSchedule, buildSchedule } from '../services/scheduler.service.js';
 
 const router = Router();
 
@@ -35,6 +35,35 @@ function finalizeMatchResult(match, now = new Date()) {
     match.resultUpdatedAt = now;
     match.status = 'finished';
 }
+
+function summarizeScheduledMatches(matches) {
+    const scheduledMatches = matches.filter((m) => m?.startAt && m?.endAt && m?.courtNumber && m?.voided !== true);
+    const roundNumbers = [...new Set(scheduledMatches.map((m) => Number(m.roundNumber)).filter(Number.isFinite))].sort((a, b) => a - b);
+    const starts = scheduledMatches.map((m) => new Date(m.startAt).getTime()).filter(Number.isFinite);
+    const ends = scheduledMatches.map((m) => new Date(m.endAt).getTime()).filter(Number.isFinite);
+
+    const courtDistribution = scheduledMatches.reduce((acc, m) => {
+        const key = String(m.courtNumber ?? 'unknown');
+        acc[key] = (acc[key] ?? 0) + 1;
+        return acc;
+    }, {});
+
+    const categoryDistribution = scheduledMatches.reduce((acc, m) => {
+        const key = String(m.categoryId?._id ?? m.categoryId ?? 'unknown');
+        acc[key] = (acc[key] ?? 0) + 1;
+        return acc;
+    }, {});
+
+    return {
+        scheduled: scheduledMatches.length,
+        rounds: roundNumbers,
+        firstStartAt: starts.length ? new Date(Math.min(...starts)).toISOString() : null,
+        lastEndAt: ends.length ? new Date(Math.max(...ends)).toISOString() : null,
+        courtDistribution,
+        categoryDistribution
+    };
+}
+
 
 /**
  * Meccsek listázása (query paraméterekkel)
@@ -380,6 +409,151 @@ router.post('/group/:groupId/schedule', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+
+/**
+ * Globális group scheduler tournament szinten.
+ * Fair alapelv:
+ * - egy kategória ne tudjon tartósan elszaladni, ha más kategóriának is van ütemezhető meccse
+ * - ugyanakkor a pályák ne álljanak feleslegesen üresen
+ */
+router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
+    try {
+        const tournament = await Tournament.findById(req.params.tournamentId).select('config status').lean();
+        if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
+        if (tournament.status === 'finished') return res.status(409).json({ error: 'Tournament finished' });
+
+        const {
+            startAt,
+            courtsCount,
+            matchMinutes,
+            playerRestMinutes,
+            breakMinutes,
+            courtTurnoverMinutes,
+            force = false,
+            fairnessGap = 1
+        } = req.body ?? {};
+
+        const parsedStart = startAt ? new Date(startAt) : new Date();
+        if (Number.isNaN(parsedStart.getTime())) {
+            return res.status(400).json({ error: 'Invalid startAt' });
+        }
+
+        const cfg = tournament.config ?? {};
+        const cCount = Number(courtsCount ?? cfg.courtsCount ?? 1);
+        const mMin = Number(matchMinutes ?? cfg.estimatedMatchMinutes ?? 35);
+        const restMin = Number(playerRestMinutes ?? breakMinutes ?? cfg.minRestPlayerMinutes ?? 20);
+        const turnoverMin = Number(courtTurnoverMinutes ?? cfg.courtTurnoverMinutes ?? 0);
+        const fairGap = Number(fairnessGap ?? 1);
+
+        if (!Number.isInteger(cCount) || cCount < 1 || cCount > 50) {
+            return res.status(400).json({ error: 'courtsCount must be an integer between 1 and 50' });
+        }
+        if (!Number.isFinite(mMin) || mMin <= 0 || mMin > 240) {
+            return res.status(400).json({ error: 'matchMinutes must be between 1 and 240' });
+        }
+        if (!Number.isFinite(restMin) || restMin < 0 || restMin > 240) {
+            return res.status(400).json({ error: 'playerRestMinutes must be between 0 and 240' });
+        }
+        if (!Number.isFinite(turnoverMin) || turnoverMin < 0 || turnoverMin > 120) {
+            return res.status(400).json({ error: 'courtTurnoverMinutes must be between 0 and 120' });
+        }
+        if (!Number.isInteger(fairGap) || fairGap < 0 || fairGap > 5) {
+            return res.status(400).json({ error: 'fairnessGap must be an integer between 0 and 5' });
+        }
+
+        const filter = {
+            tournamentId: req.params.tournamentId,
+            round: 'group',
+            status: 'pending',
+            voided: { $ne: true }
+        };
+        if (!force) filter.startAt = null;
+
+        const toSchedule = await Match.find(filter)
+            .select('_id tournamentId categoryId groupId player1 player2 roundNumber createdAt')
+            .sort({ categoryId: 1, roundNumber: 1, createdAt: 1 })
+            .lean();
+
+        if (toSchedule.length === 0) {
+            return res.json({ scheduled: 0, message: 'No group matches to schedule with current filter' });
+        }
+
+        const playerIds = new Set();
+        toSchedule.forEach((m) => {
+            playerIds.add(String(m.player1));
+            playerIds.add(String(m.player2));
+        });
+
+        const players = await Player.find({ _id: { $in: Array.from(playerIds) } })
+            .select('_id checkedInAt mainEligibility')
+            .lean();
+
+        const okPlayers = new Set(
+            players
+                .filter((p) => p.checkedInAt && p.mainEligibility === 'main')
+                .map((p) => String(p._id))
+        );
+
+        const filtered = toSchedule.filter((m) => okPlayers.has(String(m.player1)) && okPlayers.has(String(m.player2)));
+        if (filtered.length === 0) {
+            return res.json({
+                scheduled: 0,
+                message: 'No schedulable group matches: require both players checked-in and main-eligible'
+            });
+        }
+
+        const scheduledIds = filtered.map((m) => m._id);
+        const existing = await Match.find({
+            tournamentId: req.params.tournamentId,
+            voided: { $ne: true },
+            courtNumber: { $ne: null },
+            startAt: { $ne: null },
+            endAt: { $ne: null },
+            _id: { $nin: scheduledIds }
+        })
+            .select('_id categoryId round player1 player2 courtNumber startAt endAt')
+            .lean();
+
+        const plan = buildGlobalSchedule(filtered, {
+            startAt: parsedStart,
+            courtsCount: cCount,
+            matchMinutes: mMin,
+            playerRestMinutes: restMin,
+            courtTurnoverMinutes: turnoverMin,
+            fairnessGap: fairGap,
+            existingMatches: existing
+        });
+
+        const ops = plan.map((p) => ({
+            updateOne: {
+                filter: { _id: p.matchId, status: 'pending' },
+                update: { $set: { startAt: p.startAt, endAt: p.endAt, courtNumber: p.courtNumber } }
+            }
+        }));
+
+        if (ops.length > 0) {
+            await Match.bulkWrite(ops);
+        }
+
+        const updated = await Match.find({ tournamentId: req.params.tournamentId, round: 'group' })
+            .sort({ startAt: 1, createdAt: 1 })
+            .populate('categoryId', 'name')
+            .populate('player1', 'name')
+            .populate('player2', 'name')
+            .populate('winner', 'name');
+
+        res.json({
+            scheduled: plan.length,
+            fairnessGap: fairGap,
+            summary: summarizeScheduledMatches(updated),
+            matches: updated
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 /**
  * Ütemezés reset (MVP)

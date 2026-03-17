@@ -17,8 +17,9 @@
     "smoke:playoff": "node src/scripts/e2e_playoff_qualifiers.js",
     "smoke:rules": "node src/scripts/e2e_match_rules.js",
     "smoke:config": "node src/scripts/e2e_config_validation.js",
-    "smoke:all": "npm run selftest && npm run smoke:e2e && npm run smoke:checkin && npm run smoke:withdraw && npm run smoke:standings && npm run smoke:playoff && npm run smoke:rules && npm run smoke:config",
-    "cleanup:smoke:apply": "node src/scripts/cleanup_smoke.js --apply"
+    "smoke:all": "npm run selftest && npm run smoke:e2e && npm run smoke:checkin && npm run smoke:withdraw && npm run smoke:standings && npm run smoke:playoff && npm run smoke:global && npm run smoke:rules && npm run smoke:config",
+    "cleanup:smoke:apply": "node src/scripts/cleanup_smoke.js --apply",
+    "smoke:global": "node src/scripts/e2e_global_schedule.js"
   },
   "keywords": [],
   "author": "",
