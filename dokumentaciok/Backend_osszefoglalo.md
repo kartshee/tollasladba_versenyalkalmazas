@@ -1,6 +1,6 @@
 # Összefoglaló a tollaslabda versenykezelő rendszer backendjéről
 
-A rendszer jelenlegi állapotában a backend már működőképes, és az alapvető üzleti logikák automatizált tesztekkel is ellenőrizve lettek.
+A rendszer jelenlegi állapotában a backend már működőképes, és az alapvető üzleti logikák automatizált tesztekkel is ellenőrizve lettek. A korábbi versenykezelési funkciók mellett bekerült egy célzott műveleti naplózás és többféle CSV export is.
 
 ## Mit tud jelenleg a backend
 
@@ -19,9 +19,11 @@ A backend jelenleg az alábbi fő funkciókat támogatja:
 - visszalépések kezelése
 - csoportállás számítása tie-break szabályokkal
 - továbbjutók kiválasztása
-- playoff ág generálása
+- playoff ág generálása kategórián belül, a csoportkör folytatásaként
 - konfigurálható meccsszabályok kezelése
 - hibás konfigurációk kiszűrése
+- fontos műveletek naplózása műveleti napló formájában
+- adatok exportálása CSV formátumban
 
 A rendszerhez automatizált smoke tesztek is készültek, amelyek a fő folyamatokat végigellenőrzik.
 
@@ -79,7 +81,7 @@ Ha minden játékos 4–5 meccset játszik, abból már általában látható:
 
 Ehhez a rendszer további rangsorolási szabályokat is alkalmaz, tehát nem csak a győzelmek száma számít.
 
-### A csonka roundrobin a rendszerben
+### A csonka round robin a rendszerben
 
 A backend úgy generál meccseket, hogy:
 
@@ -155,11 +157,13 @@ Holtverseny esetén több szintű logikát használ:
 - kétfős holtversenynél egymás elleni eredmény
 - többfős holtversenynél mini-tabella
 - ezen belül szükség esetén:
-    - szettkülönbség
-    - pontkülönbség
-    - determinisztikus fallback
+  - szettkülönbség
+  - pontkülönbség
+  - determinisztikus fallback
 
 Ez azért fontos, mert csonka round robin vagy szoros csoportkör esetén könnyen kialakulhatnak bonyolult holtversenyhelyzetek, amelyeket a rendszernek következetesen kell kezelnie.
+
+A determinisztikus fallback lényege, hogy ha a korábbi tie-break szintek sem döntenek, akkor a rendszer mindig ugyanabból az állapotból ugyanazt a sorrendet állítja elő. Ez azért fontos, mert így nincs véletlenszerű vagy adminisztrátori megérzésen alapuló sorrendalkotás, hanem a rendezés reprodukálható és következetes marad.
 
 ## Továbbjutás és playoff
 
@@ -174,6 +178,8 @@ A párosítások a helyezések alapján jönnek létre, például:
 
 - 1. helyezett a 4. helyezett ellen
 - 2. helyezett a 3. helyezett ellen
+
+A playoff minden esetben az adott kategórián belül értelmezett, a kategória csoportkörének folytatása. Külön kategóriák között közös playoff ág nem készül.
 
 Ugyanakkor a rendszer nem feltételezi, hogy minden versenyen lesz playoff. Olyan lebonyolításra is alkalmas, ahol a csoportkör végeredménye alapján hirdetnek helyezést, vagy a legjobb játékosok továbblépnek a következő fordulóba.
 
@@ -205,6 +211,40 @@ Például ellenőrzi:
 
 A konfigurációs létrehozási folyamat tranzakciós alapon működik, így ha egy összetettebb create/configure művelet során hiba történik, a rendszer rollbacket végez, és nem hagy maga után félkész állapotot.
 
+## Műveleti naplózás
+
+A rendszer kiegészült célzott műveleti naplózással is. Ez nem teljes körű, minden lekérést rögzítő auditmechanizmus, hanem egy olyan karcsú eseménynapló, amely a fontos versenyállapot-változásokat tárolja.
+
+A naplózás célja elsősorban nem a többadminos elszámoltathatóság, hanem az, hogy egy verseny közben vagy utólag visszakövethető legyen, milyen lényeges műveletek történtek a rendszerben.
+
+A naplózott események közé tartozhat például:
+
+- verseny létrehozása
+- kategória létrehozása vagy módosítása
+- játékosok tömeges felvétele
+- check-in állapot változása
+- draw finalizálása
+- ütemezés futtatása
+- meccseredmény rögzítése vagy javítása
+- visszalépés kezelése
+- playoff generálása
+
+A rendszer tehát nemcsak végrehajtja a fontos műveleteket, hanem azok történetét is visszakövethetővé teszi.
+
+## CSV export
+
+A backend több fontos adatállomány exportját is támogatja CSV formátumban. Ez azért hasznos, mert az adatok könnyen megnyithatók táblázatkezelőben, archiválhatók, továbbküldhetők, vagy más adminisztratív feldolgozásra is használhatók.
+
+Jelenleg támogatott például:
+
+- meccslista export
+- játékos- és check-in lista export
+- csoportállás export
+
+A meccslista export tartalmazhatja többek között a kategóriát, a csoportot, a játékosokat, a státuszt, a pályát, az időpontot és az eredményt. A játékoslista export alkalmas a jelenléti és check-in információk áttekintésére. A standings export pedig a csoporton belüli sorrendet és a számolt mutatókat is ki tudja adni.
+
+Ez a funkció elsősorban gyakorlati adminisztrációs célokat szolgál, nem új lebonyolítási logikát vezet be, hanem a rendszer használhatóságát növeli.
+
 ## Tesztelés
 
 A backend működésének ellenőrzésére automatizált smoke tesztek készültek, amelyek a fő üzleti folyamatokat végigfuttatják.
@@ -221,8 +261,10 @@ Jelenleg lefedett területek:
 - globális scheduler
 - match rules
 - konfigurációvalidáció
+- műveleti naplózás
+- CSV export
 
-A teljes tesztcsomag jelenleg hibamentesen lefut.
+A teljes tesztcsomag jelenleg hibamentesen lefut, beleértve az audit és a CSV export funkciók külön smoke tesztjeit is.
 
 ## Jelenlegi állapot röviden
 
@@ -237,6 +279,8 @@ Rendelkezik:
 - eredmény- és standings kezeléssel
 - továbbjutás- és playoff logikával
 - konfigurálható meccsszabályokkal
+- célzott műveleti naplózással
+- CSV exporttal
 - automatizált tesztekkel
 
 ## Amiben kérném a véleményt
@@ -246,5 +290,6 @@ A technikai megvalósítás jelenleg jó állapotban van, ezért most elsősorba
 1. A csonka round robin ebben a formában mennyire reális és vállalható versenyhelyzetben?
 2. A csoportállás és tie-break logika mennyire tekinthető fairnek sportszakmai szempontból?
 3. A több kategóriás, fair pályaelosztás ilyen egyszerűbb verziója mennyire lenne használható a gyakorlatban?
-4. Kellene-e még olyan backend funkció, amely versenyszervezési szempontból alapvető, de jelenleg hiányzik?
-5. Inkább a jelenlegi működés finomítása lenne hasznosabb, vagy van még olyan lebonyolítási logika, amit érdemes lenne beépíteni?
+4. A jelenlegi műveleti naplózás és CSV export mennyire tekinthető hasznos, valós szervezési támogatásnak?
+5. Kellene-e még olyan backend funkció, amely versenyszervezési szempontból alapvető, de jelenleg hiányzik?
+6. Inkább a jelenlegi működés finomítása lenne hasznosabb, vagy van még olyan lebonyolítási logika, amit érdemes lenne beépíteni?
