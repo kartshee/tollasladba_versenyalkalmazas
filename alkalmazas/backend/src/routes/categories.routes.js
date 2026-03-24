@@ -6,6 +6,7 @@ import Group from '../models/Group.js';
 import Match from '../models/Match.js';
 import { normalizeCategoryPayload } from '../services/configValidation.service.js';
 import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
+import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
 const router = Router();
 
@@ -33,6 +34,18 @@ router.post('/', async (req, res) => {
         };
 
         const created = await Category.create(payload);
+
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: created.tournamentId,
+            categoryId: created._id,
+            entityType: 'category',
+            entityId: created._id,
+            action: 'category.created',
+            summary: `Category created: ${created.name}`,
+            after: pickAuditFields(created, AUDIT_SNAPSHOT_FIELDS.category)
+        });
+
         res.status(201).json(created);
     } catch (err) {
         res.status(400).json({ error: err.message });
@@ -67,9 +80,23 @@ router.patch('/:id', async (req, res) => {
     }
 
     try {
+        const before = pickAuditFields(c, AUDIT_SNAPSHOT_FIELDS.category);
         const payload = normalizeCategoryPayload(req.body ?? {}, { partial: true });
         Object.assign(c, payload);
         await c.save();
+
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: c.tournamentId,
+            categoryId: c._id,
+            entityType: 'category',
+            entityId: c._id,
+            action: 'category.updated',
+            summary: `Category updated: ${c.name}`,
+            before,
+            after: pickAuditFields(c, AUDIT_SNAPSHOT_FIELDS.category)
+        });
+
         res.json(c);
     } catch (err) {
         res.status(400).json({ error: err.message });
@@ -96,7 +123,21 @@ router.delete('/:id', async (req, res) => {
         });
     }
 
+    const before = pickAuditFields(c, AUDIT_SNAPSHOT_FIELDS.category);
     await c.deleteOne();
+
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: c.tournamentId,
+        categoryId: c._id,
+        entityType: 'category',
+        entityId: c._id,
+        action: 'category.deleted',
+        summary: `Category deleted: ${c.name}`,
+        before,
+        metadata: { relatedCounts: { players: playersCount, groups: groupsCount, matches: matchesCount } }
+    });
+
     res.json({ ok: true });
 });
 

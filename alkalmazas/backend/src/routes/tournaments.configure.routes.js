@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Tournament from '../models/Tournament.js';
 import Category from '../models/Category.js';
 import { normalizeTournamentPayload, normalizeCategoryPayload } from '../services/configValidation.service.js';
+import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
 const router = Router();
 
@@ -31,6 +32,20 @@ router.post('/configure', async (req, res) => {
 
         await session.commitTransaction();
         session.endSession();
+
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: t._id,
+            entityType: 'tournament',
+            entityId: t._id,
+            action: 'tournament.configured',
+            summary: `Tournament configured with ${createdCategories.length} categories: ${t.name}`,
+            after: {
+                tournament: pickAuditFields(t, AUDIT_SNAPSHOT_FIELDS.tournament),
+                categories: createdCategories.map((c) => pickAuditFields(c, AUDIT_SNAPSHOT_FIELDS.category))
+            },
+            metadata: { categoriesCreated: createdCategories.length }
+        });
 
         return res.status(201).json({
             tournament: t,

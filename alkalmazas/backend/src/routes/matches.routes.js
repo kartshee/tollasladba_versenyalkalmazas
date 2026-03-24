@@ -8,6 +8,7 @@ import { generatePartialRoundRobin, recommendMatchesPerPlayer } from '../service
 import { determineMatchWinner, normalizeMatchRules, validateMatchResult } from '../services/badmintonRules.service.js';
 import { buildGlobalSchedule, buildSchedule } from '../services/scheduler.service.js';
 import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
+import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
 const router = Router();
 
@@ -176,6 +177,18 @@ router.post('/group/:groupId', async (req, res) => {
             })
         );
 
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: group.tournamentId,
+            categoryId: group.categoryId,
+            groupId: group._id,
+            entityType: 'group',
+            entityId: group._id,
+            action: 'group.matches_generated',
+            summary: `Generated ${matches.length} group matches`,
+            metadata: { generated: matches.length, matchesPerPlayer: m, playersCount: n }
+        });
+
         res.status(201).json({ generated: matches.length, matches });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -208,8 +221,23 @@ router.patch('/:matchId/status', async (req, res) => {
         return res.status(409).json({ error: 'Cannot revert to pending when result exists' });
     }
 
+    const before = pickAuditFields(match, AUDIT_SNAPSHOT_FIELDS.match);
     match.status = status;
     await match.save();
+
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: match.tournamentId,
+        categoryId: match.categoryId,
+        groupId: match.groupId,
+        matchId: match._id,
+        entityType: 'match',
+        entityId: match._id,
+        action: 'match.status_updated',
+        summary: `Match status updated to ${status}`,
+        before,
+        after: pickAuditFields(match, AUDIT_SNAPSHOT_FIELDS.match)
+    });
 
     const populated = await Match.findById(match._id)
         .populate('player1', 'name')
@@ -242,11 +270,27 @@ router.patch('/:matchId/result', async (req, res) => {
         });
     }
 
+    const before = pickAuditFields(match, AUDIT_SNAPSHOT_FIELDS.match);
     match.sets = sets;
     match.winner = winner;
     match.resultType = 'played';
     finalizeMatchResult(match);
     await match.save();
+
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: match.tournamentId,
+        categoryId: match.categoryId,
+        groupId: match.groupId,
+        matchId: match._id,
+        entityType: 'match',
+        entityId: match._id,
+        action: 'match.result_recorded',
+        summary: 'Match result recorded',
+        before,
+        after: pickAuditFields(match, AUDIT_SNAPSHOT_FIELDS.match),
+        metadata: { appliedMatchRules: rules }
+    });
 
     const populated = await Match.findById(match._id)
         .populate('player1', 'name')
@@ -270,11 +314,27 @@ router.patch('/:matchId/outcome', async (req, res) => {
     if (!ensureMatchResultEditable(match, res)) return;
 
     const winner = winnerSide === 'player1' ? match.player1 : match.player2;
+    const before = pickAuditFields(match, AUDIT_SNAPSHOT_FIELDS.match);
     match.sets = [];
     match.winner = winner;
     match.resultType = type;
     finalizeMatchResult(match);
     await match.save();
+
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: match.tournamentId,
+        categoryId: match.categoryId,
+        groupId: match.groupId,
+        matchId: match._id,
+        entityType: 'match',
+        entityId: match._id,
+        action: 'match.special_outcome_recorded',
+        summary: `Special match outcome recorded: ${type}`,
+        before,
+        after: pickAuditFields(match, AUDIT_SNAPSHOT_FIELDS.match),
+        metadata: { type, winnerSide }
+    });
 
     const populated = await Match.findById(match._id)
         .populate('player1', 'name')
@@ -331,6 +391,18 @@ router.post('/group/:groupId/schedule', async (req, res) => {
 
         const ops = plan.map((pp) => ({ updateOne: { filter: { _id: pp.matchId, status: 'pending' }, update: { $set: { startAt: pp.startAt, endAt: pp.endAt, courtNumber: pp.courtNumber } } } }));
         await Match.bulkWrite(ops);
+
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: group.tournamentId,
+            categoryId: group.categoryId,
+            groupId: group._id,
+            entityType: 'group',
+            entityId: group._id,
+            action: 'group.schedule_generated',
+            summary: `Group schedule generated for ${plan.length} matches`,
+            metadata: { scheduled: plan.length, startAt: parsedStart, courtsCount: cCount, matchMinutes: mMin, playerRestMinutes: restMin, courtTurnoverMinutes: turnoverMin, force: force === true }
+        });
 
         const updated = await Match.find({ groupId: req.params.groupId, round: 'group' })
             .sort({ startAt: 1, createdAt: 1 })
@@ -416,6 +488,26 @@ router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
             .populate('player2', 'name')
             .populate('winner', 'name');
 
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: req.params.tournamentId,
+            entityType: 'tournament',
+            entityId: req.params.tournamentId,
+            action: 'tournament.global_schedule_generated',
+            summary: `Global schedule generated for ${plan.length} matches`,
+            metadata: {
+                scheduled: plan.length,
+                startAt: parsedStart,
+                courtsCount: cCount,
+                matchMinutes: mMin,
+                playerRestMinutes: restMin,
+                courtTurnoverMinutes: turnoverMin,
+                fairnessGap: fairGap,
+                force,
+                summary: summarizeScheduledMatches(updated)
+            }
+        });
+
         res.json({ scheduled: plan.length, fairnessGap: fairGap, summary: summarizeScheduledMatches(updated), matches: updated });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -430,6 +522,21 @@ router.patch('/group/:groupId/schedule/reset', async (req, res) => {
 
         const filter = { groupId, round: 'group', status: 'pending', voided: { $ne: true } };
         const result = await Match.updateMany(filter, { $set: { startAt: null, endAt: null, courtNumber: null } });
+
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: group.tournamentId,
+            categoryId: group.categoryId,
+            groupId: group._id,
+            entityType: 'group',
+            entityId: group._id,
+            action: 'group.schedule_reset',
+            summary: 'Pending group schedule reset',
+            metadata: {
+                reset: result.modifiedCount ?? result.nModified ?? 0,
+                matched: result.matchedCount ?? result.n ?? 0
+            }
+        });
 
         res.json({
             reset: result.modifiedCount ?? result.nModified ?? 0,

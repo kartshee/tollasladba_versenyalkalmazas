@@ -20,7 +20,8 @@
     "smoke:all": "npm run selftest && npm run smoke:auth && npm run smoke:e2e && npm run smoke:checkin && npm run smoke:withdraw && npm run smoke:standings && npm run smoke:playoff && npm run smoke:global && npm run smoke:rules && npm run smoke:config",
     "cleanup:smoke:apply": "node src/scripts/cleanup_smoke.js --apply",
     "smoke:global": "node src/scripts/e2e_global_schedule.js",
-    "smoke:auth": "node src/scripts/e2e_auth_ownership.js"
+    "smoke:auth": "node src/scripts/e2e_auth_ownership.js",
+    "smoke:audit": "node src/scripts/e2e_audit_log.js"
   },
   "keywords": [],
   "author": "",

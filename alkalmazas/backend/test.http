@@ -1,9 +1,7 @@
-PATCH http://localhost:5000/api/matches/697c7f4ce1128dfc81f43748/result
-Content-Type: application/json
+###
+# curl -H "Authorization: Bearer IDE_A_TOKENED"
+#  "http://localhost:5001/api/audit-logs?tournamentId=69c27bd64f4463b22ae08d7b&limit=50"
+GET http://localhost:5001/api/audit-logs?tournamentId=69c27bd64f4463b22ae08d7b&limit=50
+Authorization: Bearer IDE_A_TOKENED
 
-{
-  "sets": [
-    { "p1": 21, "p2": 10 },
-    { "p1": 21, "p2": 11 }
-  ]
-}
+###

@@ -6,6 +6,7 @@ import Group from '../models/Group.js';
 import Match from '../models/Match.js';
 import { generatePartialRoundRobin, recommendMatchesPerPlayer } from '../services/roundRobin.service.js';
 import { assertTournamentOwned } from '../services/ownership.service.js';
+import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
 const router = Router();
 
@@ -64,6 +65,19 @@ router.post('/:id/players', async (req, res) => {
         mainEligibility: locked ? 'friendly_only' : 'main'
     });
 
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: category.tournamentId,
+        categoryId: category._id,
+        playerId: player._id,
+        entityType: 'player',
+        entityId: player._id,
+        action: 'player.created_from_category',
+        summary: `Player added to category ${category.name}: ${player.name}`,
+        after: pickAuditFields(player, AUDIT_SNAPSHOT_FIELDS.player),
+        metadata: { lockedCategory: locked }
+    });
+
     res.status(201).json(player);
 });
 
@@ -91,6 +105,23 @@ router.post('/:id/players/bulk', async (req, res) => {
     }));
 
     const created = await Player.insertMany(docs, { ordered: true });
+
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: category.tournamentId,
+        categoryId: category._id,
+        entityType: 'category',
+        entityId: category._id,
+        action: 'category.players_bulk_imported',
+        summary: `Bulk player import into ${category.name}: ${created.length} players`,
+        metadata: {
+            createdCount: created.length,
+            lockedCategory: locked,
+            playerIds: created.map((p) => String(p._id)),
+            playerNames: created.map((p) => p.name)
+        }
+    });
+
     res.status(201).json({ created: created.length, players: created });
 });
 
@@ -107,11 +138,26 @@ router.patch('/:id/checkin/grace', async (req, res) => {
         }
     }
 
+    const before = pickAuditFields(category, AUDIT_SNAPSHOT_FIELDS.category);
     category.checkIn = category.checkIn ?? {};
     category.checkIn.graceMinutesOverride = graceMinutesOverride ?? null;
     category.checkIn.graceOverrideReason = String(reason ?? '');
 
     await category.save();
+
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: category.tournamentId,
+        categoryId: category._id,
+        entityType: 'category',
+        entityId: category._id,
+        action: 'category.checkin_grace_updated',
+        summary: `Check-in grace updated for ${category.name}`,
+        before,
+        after: pickAuditFields(category, AUDIT_SNAPSHOT_FIELDS.category),
+        metadata: { reason: String(reason ?? '') }
+    });
+
     res.json(category);
 });
 
@@ -224,9 +270,28 @@ router.post('/:id/finalize-draw', async (req, res) => {
         }
     }
 
+    const before = pickAuditFields(category, AUDIT_SNAPSHOT_FIELDS.category);
     category.status = 'draw_locked';
     category.drawLockedAt = new Date();
     await category.save();
+
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: category.tournamentId,
+        categoryId: category._id,
+        entityType: 'category',
+        entityId: category._id,
+        action: 'category.draw_finalized',
+        summary: `Draw finalized for ${category.name}`,
+        before,
+        after: pickAuditFields(category, AUDIT_SNAPSHOT_FIELDS.category),
+        metadata: {
+            groupsCreated: groups.length,
+            generatedMatches: totalGenerated,
+            drawVersion,
+            warnings
+        }
+    });
 
     res.json({
         categoryId: String(category._id),
@@ -314,6 +379,23 @@ router.post('/:id/close-grace', async (req, res) => {
         );
     }
 
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: category.tournamentId,
+        categoryId: category._id,
+        entityType: 'category',
+        entityId: category._id,
+        action: 'category.grace_closed',
+        summary: `Grace closed for ${category.name}`,
+        metadata: {
+            absentPlayers: absentIds.length,
+            absentPlayerIds: absentIds.map((id) => String(id)),
+            voidedMatches: voidRes.modifiedCount ?? voidRes.nModified ?? 0,
+            deadline,
+            forced: force
+        }
+    });
+
     res.json({
         absentPlayers: absentIds.length,
         voidedMatches: voidRes.modifiedCount ?? voidRes.nModified ?? 0,
@@ -366,6 +448,19 @@ router.post('/:id/friendly-match', async (req, res) => {
         resultUpdatedAt: null,
         sets: [],
         winner: null
+    });
+
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: category.tournamentId,
+        categoryId: category._id,
+        matchId: m._id,
+        entityType: 'match',
+        entityId: m._id,
+        action: 'match.friendly_created',
+        summary: `Friendly match created in ${category.name}`,
+        after: pickAuditFields(m, AUDIT_SNAPSHOT_FIELDS.match),
+        metadata: { player1Name: p1.name, player2Name: p2.name }
     });
 
     res.status(201).json(m);

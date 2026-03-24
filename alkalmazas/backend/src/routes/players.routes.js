@@ -4,6 +4,7 @@ import Player from '../models/Player.js';
 import Tournament from '../models/Tournament.js';
 import Category from '../models/Category.js';
 import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
+import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
 const router = Router();
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -52,6 +53,18 @@ router.post('/', async (req, res) => {
             mainEligibility: 'main'
         });
 
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: player.tournamentId,
+            categoryId: player.categoryId,
+            playerId: player._id,
+            entityType: 'player',
+            entityId: player._id,
+            action: 'player.created',
+            summary: `Player created: ${player.name}`,
+            after: pickAuditFields(player, AUDIT_SNAPSHOT_FIELDS.player)
+        });
+
         res.status(201).json(player);
     } catch (err) {
         res.status(400).json({ error: err.message });
@@ -98,8 +111,22 @@ router.patch('/:playerId/checkin', async (req, res) => {
     const t = await Tournament.findOne({ _id: player.tournamentId, ownerId: req.user._id }).lean();
     if (!t) return res.status(404).json({ error: 'Player not found' });
 
+    const before = pickAuditFields(player, AUDIT_SNAPSHOT_FIELDS.player);
     player.checkedInAt = checkedIn ? new Date() : null;
     await player.save();
+
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: player.tournamentId,
+        categoryId: player.categoryId,
+        playerId: player._id,
+        entityType: 'player',
+        entityId: player._id,
+        action: checkedIn ? 'player.checked_in' : 'player.checked_out',
+        summary: `${checkedIn ? 'Checked in' : 'Checked out'} player: ${player.name}`,
+        before,
+        after: pickAuditFields(player, AUDIT_SNAPSHOT_FIELDS.player)
+    });
 
     res.json(player);
 });

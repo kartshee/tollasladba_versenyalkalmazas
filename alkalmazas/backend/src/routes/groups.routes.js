@@ -6,6 +6,7 @@ import Player from '../models/Player.js';
 import Tournament from '../models/Tournament.js';
 import Category from '../models/Category.js';
 import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
+import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
 const router = Router();
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -268,6 +269,18 @@ router.post('/', async (req, res) => {
             players
         });
 
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId,
+            categoryId,
+            groupId: group._id,
+            entityType: 'group',
+            entityId: group._id,
+            action: 'group.created',
+            summary: `Group created: ${group.name}`,
+            after: pickAuditFields(group, AUDIT_SNAPSHOT_FIELDS.group)
+        });
+
         res.status(201).json(group);
     } catch (err) {
         res.status(400).json({ error: err.message });
@@ -354,6 +367,8 @@ router.patch('/:groupId/withdraw', async (req, res) => {
                 ? policy
                 : (reason === 'injury' ? 'keep_results' : 'delete_results');
 
+        const before = pickAuditFields(group, AUDIT_SNAPSHOT_FIELDS.group);
+
         // upsert withdrawal record (ne duplikáljon)
         group.withdrawals = group.withdrawals ?? [];
         const existingIdx = group.withdrawals.findIndex(w => String(w.playerId) === String(playerId));
@@ -439,6 +454,21 @@ router.patch('/:groupId/withdraw', async (req, res) => {
         });
 
         if (ops.length > 0) await Match.bulkWrite(ops);
+
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: group.tournamentId,
+            categoryId: group.categoryId,
+            groupId: group._id,
+            playerId,
+            entityType: 'group',
+            entityId: group._id,
+            action: 'group.player_withdrawn',
+            summary: `Player withdrawn from group ${group.name}`,
+            before,
+            after: pickAuditFields(group, AUDIT_SNAPSHOT_FIELDS.group),
+            metadata: { playerId: String(playerId), reason, policy: effectivePolicy, note: String(note ?? ''), autoFinishedAsWO: ops.length }
+        });
 
         return res.json({
             ok: true,
@@ -588,6 +618,18 @@ router.post('/:groupId/playoff', async (req, res) => {
             .populate('player2', 'name')
             .populate('winner', 'name');
 
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: group.tournamentId,
+            categoryId: group.categoryId,
+            groupId: group._id,
+            entityType: 'group',
+            entityId: group._id,
+            action: 'group.playoff_generated',
+            summary: `Playoff final generated for group ${group.name}`,
+            metadata: { qualifiersPerGroup, qualifiedPlayerIds: qualified.map((s) => String(s.player._id)), createdMatchIds: [String(final._id)] }
+        });
+
         return res.status(201).json({
             groupId: group._id,
             qualifiersPerGroup,
@@ -645,6 +687,18 @@ router.post('/:groupId/playoff', async (req, res) => {
         .populate('player1', 'name')
         .populate('player2', 'name')
         .populate('winner', 'name');
+
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: group.tournamentId,
+        categoryId: group.categoryId,
+        groupId: group._id,
+        entityType: 'group',
+        entityId: group._id,
+        action: 'group.playoff_generated',
+        summary: `Playoff semifinals generated for group ${group.name}`,
+        metadata: { qualifiersPerGroup, qualifiedPlayerIds: qualified.map((s) => String(s.player._id)), createdMatchIds: created.map((m) => String(m._id)) }
+    });
 
     res.status(201).json({
         groupId: group._id,
@@ -720,6 +774,18 @@ router.post('/:groupId/playoff/final', async (req, res) => {
         .populate('player1', 'name')
         .populate('player2', 'name')
         .populate('winner', 'name');
+
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: group.tournamentId,
+        categoryId: group.categoryId,
+        groupId: group._id,
+        entityType: 'group',
+        entityId: group._id,
+        action: 'group.playoff_final_generated',
+        summary: `Playoff final generated from semifinals for group ${group.name}`,
+        metadata: { semifinalIds: semis.map((m) => String(m._id)), finalId: String(final._id) }
+    });
 
     res.status(201).json(populatedFinal);
 });
