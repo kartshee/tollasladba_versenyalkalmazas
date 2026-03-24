@@ -17,11 +17,12 @@
     "smoke:playoff": "node src/scripts/e2e_playoff_qualifiers.js",
     "smoke:rules": "node src/scripts/e2e_match_rules.js",
     "smoke:config": "node src/scripts/e2e_config_validation.js",
-    "smoke:all": "npm run selftest && npm run smoke:auth && npm run smoke:e2e && npm run smoke:checkin && npm run smoke:withdraw && npm run smoke:standings && npm run smoke:playoff && npm run smoke:global && npm run smoke:rules && npm run smoke:config",
+    "smoke:all": "npm run selftest && npm run smoke:auth && npm run smoke:e2e && npm run smoke:checkin && npm run smoke:withdraw && npm run smoke:standings && npm run smoke:playoff && npm run smoke:global && npm run smoke:rules && npm run smoke:config && npm run smoke:audit && npm run smoke:csv",
     "cleanup:smoke:apply": "node src/scripts/cleanup_smoke.js --apply",
     "smoke:global": "node src/scripts/e2e_global_schedule.js",
     "smoke:auth": "node src/scripts/e2e_auth_ownership.js",
-    "smoke:audit": "node src/scripts/e2e_audit_log.js"
+    "smoke:audit": "node src/scripts/e2e_audit_log.js",
+    "smoke:csv": "node src/scripts/e2e_csv_export.js"
   },
   "keywords": [],
   "author": "",
