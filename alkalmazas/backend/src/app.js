@@ -12,6 +12,9 @@ import categoryRoutes from './routes/categories.routes.js';
 import categoryOpsRoutes from './routes/categories.ops.routes.js';
 import auditRoutes from './routes/audit.routes.js';
 import exportRoutes from './routes/exports.routes.js';
+import entryRoutes from './routes/entries.routes.js';
+import paymentRoutes from './routes/payments.routes.js';
+import publicRoutes from './routes/public.routes.js';
 import { requireAuth } from './middleware/auth.middleware.js';
 
 dotenv.config();
@@ -33,6 +36,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use('/api/auth', authRoutes);
+app.use('/public', publicRoutes);
 app.use('/api', requireAuth);
 
 app.use('/api/players', playerRoutes);
@@ -44,6 +48,8 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/categories', categoryOpsRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/exports', exportRoutes);
+app.use('/api/entries', entryRoutes);
+app.use('/api/payment-groups', paymentRoutes);
 
 app.get('/health', (req, res) => {
     res.json({ ok: true, dbReadyState: mongoose.connection.readyState });

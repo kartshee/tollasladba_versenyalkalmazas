@@ -3,7 +3,6 @@ import { createAuthContext } from './_auth.js';
 
 let j;
 
-
 async function setupCategory({ tournamentId, name, qualifiersPerGroup, playerNames }) {
     const category = await j('POST', '/api/categories', {
         tournamentId,
@@ -102,10 +101,10 @@ async function runQualifiersTwoScenario(tournamentId) {
 
     const created = await j('POST', `/api/groups/${group._id}/playoff`);
     assert.equal(created.qualifiersPerGroup, 2);
-    assert.equal(created.playoff.semis.length, 0);
-    assert(created.playoff.final?._id);
+    assert.equal(created.playoff.round, 'playoff_final');
+    assert.equal(created.playoff.matches.length, 1);
 
-    const final = created.playoff.final;
+    const final = created.playoff.matches[0];
     const finalNames = [final.player1.name, final.player2.name].sort();
     assert.deepEqual(finalNames, ['A', 'B']);
 
@@ -128,24 +127,24 @@ async function runQualifiersFourScenario(tournamentId) {
 
     const created = await j('POST', `/api/groups/${group._id}/playoff`);
     assert.equal(created.qualifiersPerGroup, 4);
-    assert.equal(created.playoff.semis.length, 2);
-    assert.equal(created.playoff.final, null);
+    assert.equal(created.playoff.round, 'playoff_semi');
+    assert.equal(created.playoff.matches.length, 2);
 
-    const semiPairs = created.playoff.semis
+    const semiPairs = created.playoff.matches
         .map((m) => [m.player1.name, m.player2.name].sort().join('-'))
         .sort();
     assert.deepEqual(semiPairs, ['A-D', 'B-C']);
 
-    const semiOne = created.playoff.semis.find((m) => [m.player1.name, m.player2.name].includes('A'));
-    const semiTwo = created.playoff.semis.find((m) => [m.player1.name, m.player2.name].includes('B'));
+    const semiOne = created.playoff.matches.find((m) => [m.player1.name, m.player2.name].includes('A'));
+    const semiTwo = created.playoff.matches.find((m) => [m.player1.name, m.player2.name].includes('B'));
     assert(semiOne?._id && semiTwo?._id);
 
     await setPlayed(semiOne._id, [{ p1: 21, p2: 13 }, { p1: 21, p2: 13 }]);
     await setPlayed(semiTwo._id, [{ p1: 21, p2: 16 }, { p1: 21, p2: 16 }]);
 
-    const finalCreated = await j('POST', `/api/groups/${group._id}/playoff/final`);
-    assert.equal(finalCreated.round, 'playoff_final');
-    const finalNames = [finalCreated.player1.name, finalCreated.player2.name].sort();
+    const finalCreated = await j('POST', `/api/groups/${group._id}/playoff/advance`);
+    assert.equal(finalCreated.matches[0].round, 'playoff_final');
+    const finalNames = [finalCreated.matches[0].player1.name, finalCreated.matches[0].player2.name].sort();
     assert.deepEqual(finalNames, ['A', 'B']);
 
     return {

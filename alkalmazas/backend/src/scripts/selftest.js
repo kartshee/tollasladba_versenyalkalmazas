@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { generatePartialRoundRobin } from '../services/roundRobin.service.js';
 import { buildSchedule } from '../services/scheduler.service.js';
+import { computeStandings, findCutoffTieBlock } from '../services/standings.service.js';
+import { normalizeCategoryPayload } from '../services/configValidation.service.js';
+import { buildSeededBracketPairs, getInitialPlayoffRoundName, getNextPlayoffRoundName } from '../services/playoff.service.js';
 
 function pairKey(a, b) {
   const x = String(a);
@@ -12,12 +15,10 @@ function checkRR({ n, m, expectStrictPerPlayer = true }) {
   const ids = Array.from({ length: n }, (_, i) => `p${i}`);
   const matches = generatePartialRoundRobin(ids, m);
 
-  // no self matches
   for (const mm of matches) {
     assert.notEqual(String(mm.player1), String(mm.player2), 'self match');
   }
 
-  // no duplicate pairs
   const seen = new Set();
   for (const mm of matches) {
     const k = pairKey(mm.player1, mm.player2);
@@ -42,7 +43,6 @@ function checkRR({ n, m, expectStrictPerPlayer = true }) {
 }
 
 function checkSchedule({ matches, courtsCount = 2, matchMinutes = 35, restMinutes = 20, turnoverMinutes = 0 }) {
-  // Scheduler expects docs with _id, player1, player2
   const docs = matches.map((m, idx) => ({
     _id: `m${idx}`,
     player1: m.player1,
@@ -61,7 +61,6 @@ function checkSchedule({ matches, courtsCount = 2, matchMinutes = 35, restMinute
 
   assert.equal(plan.length, docs.length, 'schedule length mismatch');
 
-  // Court non-overlap
   const byCourt = new Map();
   for (const p of plan) {
     const c = p.courtNumber;
@@ -74,7 +73,6 @@ function checkSchedule({ matches, courtsCount = 2, matchMinutes = 35, restMinute
     }
   }
 
-  // Player rest constraint
   const matchMs = matchMinutes * 60 * 1000;
   const restMs = restMinutes * 60 * 1000;
 
@@ -86,7 +84,6 @@ function checkSchedule({ matches, courtsCount = 2, matchMinutes = 35, restMinute
     byPlayer.set(p1, [...(byPlayer.get(p1) ?? []), p]);
     byPlayer.set(p2, [...(byPlayer.get(p2) ?? []), p]);
 
-    // sanity: endAt-startAt
     assert.equal(p.endAt - p.startAt, matchMs, 'wrong duration');
     assert(p.startAt >= startAt, 'starts before base');
   }
@@ -102,8 +99,92 @@ function checkSchedule({ matches, courtsCount = 2, matchMinutes = 35, restMinute
   return plan;
 }
 
+function player(id, name) {
+  return { _id: id, name };
+}
+
+function match(player1, player2, winner, sets, resultType = 'played') {
+  return { player1, player2, winner, sets, resultType, status: 'finished', voided: false };
+}
+
+function checkStandingsPolicies() {
+  const A = player('a', 'A');
+  const B = player('b', 'B');
+  const C = player('c', 'C');
+  const D = player('d', 'D');
+  const players = [A, B, C, D];
+
+  const matches = [
+    match(A._id, B._id, A._id, [{ p1: 21, p2: 18 }, { p1: 21, p2: 18 }]),
+    match(B._id, C._id, B._id, [{ p1: 21, p2: 18 }, { p1: 21, p2: 18 }]),
+    match(C._id, A._id, C._id, [{ p1: 21, p2: 18 }, { p1: 21, p2: 18 }]),
+    match(A._id, D._id, A._id, [{ p1: 21, p2: 5 }, { p1: 21, p2: 5 }]),
+    match(B._id, D._id, B._id, [{ p1: 21, p2: 10 }, { p1: 21, p2: 10 }]),
+    match(C._id, D._id, C._id, [{ p1: 21, p2: 15 }, { p1: 21, p2: 15 }])
+  ];
+
+  const directOnly = computeStandings(players, matches, {
+    multiTiePolicy: 'direct_only',
+    unresolvedTiePolicy: 'shared_place'
+  });
+  assert.equal(directOnly[0].place, 1);
+  assert.equal(directOnly[1].place, 1);
+  assert.equal(directOnly[2].place, 1);
+  assert.equal(directOnly[0].tieResolved, false);
+  assert(findCutoffTieBlock(directOnly, 2)?.length === 3, 'expected cutoff tie block of 3');
+
+  const directThenOverall = computeStandings(players, matches, {
+    multiTiePolicy: 'direct_then_overall',
+    unresolvedTiePolicy: 'manual_override'
+  });
+  assert.deepEqual(directThenOverall.slice(0, 4).map((x) => x.player.name), ['A', 'B', 'C', 'D']);
+  assert.equal(directThenOverall[0].tieResolved, true);
+  assert.equal(findCutoffTieBlock(directThenOverall, 2), null);
+
+  const exactTie = computeStandings([A, B], [
+    match(A._id, B._id, A._id, [] , 'wo')
+  ], {
+    multiTiePolicy: 'direct_then_overall',
+    unresolvedTiePolicy: 'manual_override'
+  });
+  assert.equal(exactTie[0].player.name, 'A');
+}
+
+function checkCategoryValidation() {
+  const groupPlayoff = normalizeCategoryPayload({
+    name: 'X',
+    format: 'group+playoff',
+    groupSizeTarget: 8,
+    qualifiersPerGroup: 8
+  }, { partial: false });
+  assert.equal(groupPlayoff.playoffSize, 8);
+
+  const playoffOnly = normalizeCategoryPayload({
+    name: 'Y',
+    format: 'playoff',
+    playoffSize: 16,
+    qualifiersPerGroup: 16
+  }, { partial: false });
+  assert.equal(playoffOnly.format, 'playoff');
+  assert.equal(playoffOnly.playoffSize, 16);
+
+  assert.throws(() => normalizeCategoryPayload({
+    name: 'Bad',
+    format: 'group+playoff',
+    groupSizeTarget: 8,
+    qualifiersPerGroup: 3
+  }, { partial: false }));
+}
+
+function checkPlayoffHelpers() {
+  const entrants = ['s1', 's2', 's3', 's4'].map((id, idx) => ({ player: { _id: id, name: `P${idx + 1}` } }));
+  const pairs = buildSeededBracketPairs(entrants);
+  assert.equal(pairs.length, 2);
+  assert.equal(getInitialPlayoffRoundName(8), 'playoff_quarter');
+  assert.equal(getNextPlayoffRoundName('playoff_quarter'), 'playoff_semi');
+}
+
 function main() {
-  // Even n: strict m games/player is feasible for any m<=n-1
   for (const n of [4, 6, 8, 10, 12]) {
     for (const m of [1, 2, 3, 5, 6]) {
       if (m > n - 1) continue;
@@ -111,7 +192,6 @@ function main() {
     }
   }
 
-  // Odd n: strict m games/player is feasible only when m is even (partial) or full RR (m=n-1)
   for (const n of [5, 7, 9, 11]) {
     checkRR({ n, m: n - 1, expectStrictPerPlayer: true });
     for (const m of [2, 4, 6]) {
@@ -120,11 +200,13 @@ function main() {
     }
   }
 
-  // Scheduler smoke
   const { matches } = checkRR({ n: 8, m: 5, expectStrictPerPlayer: true });
   checkSchedule({ matches, courtsCount: 2, matchMinutes: 35, restMinutes: 20, turnoverMinutes: 0 });
+  checkStandingsPolicies();
+  checkCategoryValidation();
+  checkPlayoffHelpers();
 
-  console.log('OK: round robin + scheduler invariants passed');
+  console.log('OK: round robin + scheduler + standings + config invariants passed');
 }
 
 main();

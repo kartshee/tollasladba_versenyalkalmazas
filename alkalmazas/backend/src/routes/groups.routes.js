@@ -7,7 +7,8 @@ import Tournament from '../models/Tournament.js';
 import Category from '../models/Category.js';
 import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
-import { computeStandings } from '../services/standings.service.js';
+import { computeStandings, findCutoffTieBlock } from '../services/standings.service.js';
+import { buildSeededBracketPairs, getInitialPlayoffRoundName, getNextPlayoffRoundName, getPlayoffRoundSize, isPlayoffRound, sortPlayoffRounds } from '../services/playoff.service.js';
 
 const router = Router();
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -27,6 +28,123 @@ async function loadOwnedGroup(groupId, userId, { populatePlayers = false } = {})
     const tournament = await assertTournamentOwned(group.tournamentId, userId);
     if (!tournament) return { group: null, tournament: null };
     return { group, tournament };
+}
+
+
+function getCategoryStandingOptions(category) {
+    return {
+        multiTiePolicy: category?.multiTiePolicy ?? 'direct_then_overall',
+        unresolvedTiePolicy: category?.unresolvedTiePolicy ?? 'shared_place'
+    };
+}
+
+function buildQualifiedList(standings, qualifiersPerGroup, overrideQualifiedPlayerIds = []) {
+    const cutoffTie = findCutoffTieBlock(standings, qualifiersPerGroup);
+    if (!cutoffTie) {
+        return {
+            qualified: standings.slice(0, qualifiersPerGroup),
+            cutoffTie: null
+        };
+    }
+
+    const tiedIds = new Set(cutoffTie.map((entry) => String(entry.player._id)));
+    const locked = standings.slice(0, qualifiersPerGroup).filter((entry) => !tiedIds.has(String(entry.player._id)));
+    const seatsNeeded = qualifiersPerGroup - locked.length;
+    const overrides = [...new Set((overrideQualifiedPlayerIds ?? []).map(String))];
+
+    if (overrides.length !== seatsNeeded) {
+        return { qualified: null, cutoffTie, seatsNeeded, locked };
+    }
+
+    const allowedOverrides = cutoffTie.filter((entry) => overrides.includes(String(entry.player._id)));
+    if (allowedOverrides.length !== seatsNeeded) {
+        return { qualified: null, cutoffTie, seatsNeeded, locked };
+    }
+
+    const byOrder = new Map(standings.map((entry, index) => [String(entry.player._id), index]));
+    const qualified = [...locked, ...allowedOverrides].sort((a, b) => (byOrder.get(String(a.player._id)) ?? 0) - (byOrder.get(String(b.player._id)) ?? 0));
+    return { qualified, cutoffTie, seatsNeeded, locked };
+}
+
+function createPlayoffDocsFromStandings({ group, category, qualified }) {
+    const size = qualified.length;
+    const round = getInitialPlayoffRoundName(size);
+    const pairs = buildSeededBracketPairs(qualified);
+
+    return pairs.map((pair) => ({
+        groupId: group._id,
+        tournamentId: group.tournamentId,
+        categoryId: group.categoryId,
+        player1: pair.player1.player._id,
+        player2: pair.player2.player._id,
+        pairKey: makePairKey(pair.player1.player._id, pair.player2.player._id),
+        round,
+        status: 'pending',
+        roundNumber: pair.bracketSlot,
+        drawVersion: Number(category.drawVersion ?? 1),
+        resultType: 'played',
+        sets: [],
+        winner: null,
+        courtNumber: null,
+        startAt: null,
+        endAt: null,
+        umpireName: ''
+    }));
+}
+
+function findAdvancableRound(matches) {
+    const rounds = [...new Set(matches.map((m) => m.round).filter((round) => isPlayoffRound(round)))].sort(sortPlayoffRounds);
+    const sizes = new Set(rounds.map((round) => getPlayoffRoundSize(round)).filter(Boolean));
+    const candidates = [...sizes].sort((a, b) => a - b);
+    for (const size of candidates) {
+        if (size <= 2) continue;
+        if (sizes.has(size) && !sizes.has(size / 2)) {
+            const currentRound = rounds.find((round) => getPlayoffRoundSize(round) === size);
+            return { currentRound, nextRound: getNextPlayoffRoundName(currentRound) };
+        }
+    }
+    return null;
+}
+
+async function advanceGroupPlayoff({ group, category }) {
+    const playoffMatches = await Match.find({ groupId: group._id, voided: { $ne: true }, round: /^playoff_/ }).sort({ roundNumber: 1, createdAt: 1 }).lean();
+    if (playoffMatches.length === 0) throw new Error('No playoff matches generated yet');
+    if (playoffMatches.some((m) => m.round === 'playoff_final')) throw new Error('Playoff final already exists');
+
+    const adv = findAdvancableRound(playoffMatches);
+    if (!adv) throw new Error('No playoff round can be advanced right now');
+
+    const currentMatches = playoffMatches.filter((m) => m.round === adv.currentRound).sort((a, b) => (a.roundNumber ?? 0) - (b.roundNumber ?? 0));
+    const notFinished = currentMatches.filter((m) => !m.winner);
+    if (notFinished.length > 0) throw new Error('Current playoff round is not finished');
+
+    const docs = currentMatches.reduce((acc, match, idx, arr) => {
+        if (idx % 2 === 1) return acc;
+        const other = arr[idx + 1];
+        if (!other) return acc;
+        acc.push({
+            groupId: group._id,
+            tournamentId: group.tournamentId,
+            categoryId: group.categoryId,
+            player1: match.winner,
+            player2: other.winner,
+            pairKey: makePairKey(match.winner, other.winner),
+            round: adv.nextRound,
+            status: 'pending',
+            roundNumber: Math.floor(idx / 2) + 1,
+            drawVersion: Number(category.drawVersion ?? 1),
+            resultType: 'played',
+            sets: [],
+            winner: null,
+            courtNumber: null,
+            startAt: null,
+            endAt: null,
+            umpireName: ''
+        });
+        return acc;
+    }, []);
+
+    return Match.insertMany(docs);
 }
 
 /**
@@ -143,7 +261,7 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * Standings (wins + head-to-head tie-break)
+ * Standings
  */
 router.get('/:groupId/standings', async (req, res) => {
     if (!isValidId(req.params.groupId)) {
@@ -153,6 +271,7 @@ router.get('/:groupId/standings', async (req, res) => {
     const { group } = await loadOwnedGroup(req.params.groupId, req.user._id, { populatePlayers: true });
     if (!group) return res.status(404).json({ error: 'Group not found' });
 
+    const category = await Category.findById(group.categoryId).select('multiTiePolicy unresolvedTiePolicy').lean();
     const matches = await Match.find({
         groupId: group._id,
         round: 'group',
@@ -161,7 +280,7 @@ router.get('/:groupId/standings', async (req, res) => {
         voided: { $ne: true }
     }).lean();
 
-    const standings = computeStandings(group.players, matches);
+    const standings = computeStandings(group.players, matches, getCategoryStandingOptions(category));
     res.json(standings);
 });
 
@@ -315,29 +434,29 @@ router.get('/:groupId/playoff', async (req, res) => {
     const { group: ownedPlayoffGroup } = await loadOwnedGroup(req.params.groupId, req.user._id);
     if (!ownedPlayoffGroup) return res.status(404).json({ error: 'Group not found' });
 
-    const semis = await Match.find({
+    const matches = await Match.find({
         groupId: req.params.groupId,
-        round: 'playoff_semi',
+        round: /^playoff_/,
         voided: { $ne: true }
     })
+        .sort({ roundNumber: 1, createdAt: 1 })
         .populate('player1', 'name')
         .populate('player2', 'name')
         .populate('winner', 'name');
 
-    const final = await Match.findOne({
-        groupId: req.params.groupId,
-        round: 'playoff_final',
-        voided: { $ne: true }
-    })
-        .populate('player1', 'name')
-        .populate('player2', 'name')
-        .populate('winner', 'name');
+    const rounds = [...new Set(matches.map((m) => m.round))].sort(sortPlayoffRounds);
+    const grouped = Object.fromEntries(rounds.map((round) => [round, matches.filter((m) => m.round === round)]));
 
-    res.json({ semis, final });
+    res.json({
+        matches,
+        rounds: grouped,
+        semis: grouped.playoff_semi ?? [],
+        final: (grouped.playoff_final ?? [])[0] ?? null
+    });
 });
 
 /**
- * Playoff generálása (config alapján: top2 -> final, top4 -> 2 elődöntő)
+ * Playoff generálása a csoportból
  */
 router.post('/:groupId/playoff', async (req, res) => {
     if (!isValidId(req.params.groupId)) {
@@ -348,32 +467,29 @@ router.post('/:groupId/playoff', async (req, res) => {
     if (!group) return res.status(404).json({ error: 'Group not found' });
 
     const category = await Category.findById(group.categoryId)
-        .select('format qualifiersPerGroup');
+        .select('format qualifiersPerGroup playoffSize multiTiePolicy unresolvedTiePolicy drawVersion');
     if (!category) return res.status(404).json({ error: 'Category not found' });
 
     if (category.format !== 'group+playoff') {
         return res.status(400).json({ error: 'Category format does not allow playoff generation' });
     }
 
-    const qualifiersPerGroup = Number(category.qualifiersPerGroup ?? 4);
-    if (![2, 4].includes(qualifiersPerGroup)) {
+    const qualifiersPerGroup = Number(category.playoffSize ?? category.qualifiersPerGroup ?? 4);
+    if (![2, 4, 8, 16, 32].includes(qualifiersPerGroup)) {
         return res.status(400).json({
-            error: 'Unsupported qualifiersPerGroup. Currently supported values: 2 or 4',
+            error: 'Unsupported qualifiersPerGroup. Supported values: 2, 4, 8, 16, 32',
             qualifiersPerGroup
         });
     }
 
-    // Csoportkör meccsek (voided meccseket nem vesszük figyelembe)
     const groupMatches = await Match.find({
         groupId: group._id,
         round: 'group',
         voided: { $ne: true }
     }).lean();
 
-    // Csoportkör kész? (WO/FF/RET esetén nem kell 2 szett; played esetén kell)
     const unfinished = groupMatches.filter((m) => {
         if (!m.winner) return true;
-
         const type = m.resultType ?? 'played';
         return type === 'played' && (!Array.isArray(m.sets) || m.sets.length < 2);
     });
@@ -388,7 +504,7 @@ router.post('/:groupId/playoff', async (req, res) => {
 
     const existingPlayoff = await Match.findOne({
         groupId: group._id,
-        round: { $in: ['playoff_semi', 'playoff_final'] },
+        round: /^playoff_/,
         voided: { $ne: true }
     });
     if (existingPlayoff) {
@@ -396,7 +512,7 @@ router.post('/:groupId/playoff', async (req, res) => {
     }
 
     const finishedForStandings = groupMatches.filter((m) => !!m.winner);
-    const standings = computeStandings(group.players, finishedForStandings);
+    const standings = computeStandings(group.players, finishedForStandings, getCategoryStandingOptions(category));
 
     const deleteSet = new Set(
         (group.withdrawals ?? [])
@@ -404,109 +520,28 @@ router.post('/:groupId/playoff', async (req, res) => {
             .map((w) => String(w.playerId))
     );
 
-    const qualified = standings
-        .filter((x) => !deleteSet.has(String(x.player._id)))
-        .slice(0, qualifiersPerGroup);
-
-    if (qualified.length < qualifiersPerGroup) {
+    const eligible = standings.filter((x) => !deleteSet.has(String(x.player._id)));
+    if (eligible.length < qualifiersPerGroup) {
         return res.status(400).json({
             error: `Need at least ${qualifiersPerGroup} eligible players for playoff`,
             qualifiersPerGroup,
-            eligiblePlayers: qualified.length
+            eligiblePlayers: eligible.length
         });
     }
 
-    if (qualifiersPerGroup === 2) {
-        const [first, second] = qualified;
-
-        const final = await Match.create({
-            groupId: group._id,
-            tournamentId: group.tournamentId,
-            categoryId: group.categoryId,
-            player1: first.player._id,
-            player2: second.player._id,
-            pairKey: makePairKey(first.player._id, second.player._id),
-            round: 'playoff_final',
-            status: 'pending',
-            resultType: 'played',
-            sets: [],
-            winner: null,
-            courtNumber: null,
-            startAt: null,
-            endAt: null
-        });
-
-        const populatedFinal = await Match.findById(final._id)
-            .populate('player1', 'name')
-            .populate('player2', 'name')
-            .populate('winner', 'name');
-
-        await safeRecordAuditEvent({
-            userId: req.user._id,
-            tournamentId: group.tournamentId,
-            categoryId: group.categoryId,
-            groupId: group._id,
-            entityType: 'group',
-            entityId: group._id,
-            action: 'group.playoff_generated',
-            summary: `Playoff final generated for group ${group.name}`,
-            metadata: { qualifiersPerGroup, qualifiedPlayerIds: qualified.map((s) => String(s.player._id)), createdMatchIds: [String(final._id)] }
-        });
-
-        return res.status(201).json({
-            groupId: group._id,
+    const selection = buildQualifiedList(eligible, qualifiersPerGroup, req.body?.overrideQualifiedPlayerIds);
+    if (!selection.qualified) {
+        return res.status(409).json({
+            error: 'Unresolved tie at playoff cutoff. Provide overrideQualifiedPlayerIds or resolve manually.',
             qualifiersPerGroup,
-            qualified: qualified.map((s) => ({
-                id: s.player._id,
-                name: s.player.name,
-                wins: s.wins,
-                setDiff: s.setDiff,
-                pointDiff: s.pointDiff
-            })),
-            playoff: {
-                semis: [],
-                final: populatedFinal
-            }
+            cutoffTie: selection.cutoffTie?.map((entry) => ({ id: entry.player._id, name: entry.player.name, place: entry.place })),
+            seatsNeeded: selection.seatsNeeded ?? 0
         });
     }
 
-    const qualifiedIds = qualified.map((x) => x.player._id);
-    const created = await Match.insertMany([
-        {
-            groupId: group._id,
-            tournamentId: group.tournamentId,
-            categoryId: group.categoryId,
-            player1: qualifiedIds[0],
-            player2: qualifiedIds[3],
-            pairKey: makePairKey(qualifiedIds[0], qualifiedIds[3]),
-            round: 'playoff_semi',
-            status: 'pending',
-            resultType: 'played',
-            sets: [],
-            winner: null,
-            courtNumber: null,
-            startAt: null,
-            endAt: null
-        },
-        {
-            groupId: group._id,
-            tournamentId: group.tournamentId,
-            categoryId: group.categoryId,
-            player1: qualifiedIds[1],
-            player2: qualifiedIds[2],
-            pairKey: makePairKey(qualifiedIds[1], qualifiedIds[2]),
-            round: 'playoff_semi',
-            status: 'pending',
-            resultType: 'played',
-            sets: [],
-            winner: null,
-            courtNumber: null,
-            startAt: null,
-            endAt: null
-        }
-    ]);
-
-    const semiFinals = await Match.find({ _id: { $in: created.map((m) => m._id) } })
+    const created = await Match.insertMany(createPlayoffDocsFromStandings({ group, category, qualified: selection.qualified }));
+    const populated = await Match.find({ _id: { $in: created.map((m) => m._id) } })
+        .sort({ roundNumber: 1, createdAt: 1 })
         .populate('player1', 'name')
         .populate('player2', 'name')
         .populate('winner', 'name');
@@ -519,26 +554,65 @@ router.post('/:groupId/playoff', async (req, res) => {
         entityType: 'group',
         entityId: group._id,
         action: 'group.playoff_generated',
-        summary: `Playoff semifinals generated for group ${group.name}`,
-        metadata: { qualifiersPerGroup, qualifiedPlayerIds: qualified.map((s) => String(s.player._id)), createdMatchIds: created.map((m) => String(m._id)) }
+        summary: `Playoff generated for group ${group.name}`,
+        metadata: { qualifiersPerGroup, qualifiedPlayerIds: selection.qualified.map((s) => String(s.player._id)), createdMatchIds: created.map((m) => String(m._id)) }
     });
 
     res.status(201).json({
         groupId: group._id,
         qualifiersPerGroup,
-        qualified: qualified.map((s) => ({
+        qualified: selection.qualified.map((s) => ({
             id: s.player._id,
             name: s.player.name,
             wins: s.wins,
             setDiff: s.setDiff,
-            pointDiff: s.pointDiff
+            pointDiff: s.pointDiff,
+            place: s.place
         })),
-        playoff: { semis: semiFinals, final: null }
+        playoff: { round: getInitialPlayoffRoundName(qualifiersPerGroup), matches: populated }
     });
 });
 
 /**
- * Döntő generálása a két elődöntő winneréből
+ * Következő playoff kör generálása
+ */
+router.post('/:groupId/playoff/advance', async (req, res) => {
+    const groupId = req.params.groupId;
+    if (!isValidId(groupId)) return res.status(400).json({ error: 'Invalid groupId' });
+
+    const { group } = await loadOwnedGroup(groupId, req.user._id);
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+    const category = await Category.findById(group.categoryId).select('drawVersion');
+    if (!category) return res.status(404).json({ error: 'Category not found' });
+
+    try {
+        const created = await advanceGroupPlayoff({ group, category });
+        const populated = await Match.find({ _id: { $in: created.map((m) => m._id) } })
+            .sort({ roundNumber: 1, createdAt: 1 })
+            .populate('player1', 'name')
+            .populate('player2', 'name')
+            .populate('winner', 'name');
+
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: group.tournamentId,
+            categoryId: group.categoryId,
+            groupId: group._id,
+            entityType: 'group',
+            entityId: group._id,
+            action: 'group.playoff_advanced',
+            summary: `Playoff advanced for group ${group.name}`,
+            metadata: { createdMatchIds: created.map((m) => String(m._id)) }
+        });
+
+        res.status(201).json({ created: populated.length, matches: populated });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
+/**
+ * Visszafelé kompatibilis final generálás endpoint
  */
 router.post('/:groupId/playoff/final', async (req, res) => {
     const groupId = req.params.groupId;
@@ -546,71 +620,32 @@ router.post('/:groupId/playoff/final', async (req, res) => {
 
     const { group } = await loadOwnedGroup(groupId, req.user._id);
     if (!group) return res.status(404).json({ error: 'Group not found' });
+    const category = await Category.findById(group.categoryId).select('drawVersion');
+    if (!category) return res.status(404).json({ error: 'Category not found' });
 
-    const semis = await Match.find({
-        groupId,
-        round: 'playoff_semi',
-        voided: { $ne: true }
-    }).lean();
+    try {
+        const created = await advanceGroupPlayoff({ group, category });
+        const populated = await Match.findById(created[0]._id)
+            .populate('player1', 'name')
+            .populate('player2', 'name')
+            .populate('winner', 'name');
 
-    if (semis.length !== 2) {
-        return res.status(400).json({ error: 'Need exactly 2 semifinals to create final' });
-    }
-
-    const notFinished = semis.filter((m) => !m.winner);
-    if (notFinished.length > 0) {
-        return res.status(400).json({
-            error: 'Semifinals not finished',
-            missingWinnerIds: notFinished.map((m) => m._id)
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: group.tournamentId,
+            categoryId: group.categoryId,
+            groupId: group._id,
+            entityType: 'group',
+            entityId: group._id,
+            action: 'group.playoff_final_generated',
+            summary: `Playoff final generated for group ${group.name}`,
+            metadata: { finalId: String(created[0]._id) }
         });
+
+        res.status(201).json(populated);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
     }
-
-    const existingFinal = await Match.findOne({
-        groupId,
-        round: 'playoff_final',
-        voided: { $ne: true }
-    });
-    if (existingFinal) {
-        return res.status(409).json({ error: 'Final already exists', finalId: existingFinal._id });
-    }
-
-    const final = await Match.create({
-        groupId,
-        tournamentId: group.tournamentId,
-        categoryId: group.categoryId,
-
-        player1: semis[0].winner,
-        player2: semis[1].winner,
-        pairKey: makePairKey(semis[0].winner, semis[1].winner),
-
-        round: 'playoff_final',
-        status: 'pending',
-        resultType: 'played',
-        sets: [],
-        winner: null,
-        courtNumber: null,
-        startAt: null,
-        endAt: null
-    });
-
-    const populatedFinal = await Match.findById(final._id)
-        .populate('player1', 'name')
-        .populate('player2', 'name')
-        .populate('winner', 'name');
-
-    await safeRecordAuditEvent({
-        userId: req.user._id,
-        tournamentId: group.tournamentId,
-        categoryId: group.categoryId,
-        groupId: group._id,
-        entityType: 'group',
-        entityId: group._id,
-        action: 'group.playoff_final_generated',
-        summary: `Playoff final generated from semifinals for group ${group.name}`,
-        metadata: { semifinalIds: semis.map((m) => String(m._id)), finalId: String(final._id) }
-    });
-
-    res.status(201).json(populatedFinal);
 });
 
 router.get('/:groupId/winner', async (req, res) => {

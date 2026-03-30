@@ -64,16 +64,25 @@ export function compareByPrimaryStats(a, b) {
     return 0;
 }
 
-export function compareBySetPointAndName(a, b) {
+export function compareBySetPoint(a, b) {
     if (b.setDiff !== a.setDiff) return b.setDiff - a.setDiff;
     if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
+    return 0;
+}
 
-    const nameA = String(a.player?.name ?? '');
-    const nameB = String(b.player?.name ?? '');
-    const byName = nameA.localeCompare(nameB, 'hu');
-    if (byName !== 0) return byName;
+function compareStable(a, b) {
+    return String(a.player?._id ?? '').localeCompare(String(b.player?._id ?? ''));
+}
 
-    return String(a.player?._id).localeCompare(String(b.player?._id));
+function defaultStandingOptions(options = {}) {
+    return {
+        multiTiePolicy: options.multiTiePolicy ?? 'direct_then_overall',
+        unresolvedTiePolicy: options.unresolvedTiePolicy ?? 'shared_place'
+    };
+}
+
+function makeResult(entry, { unresolved = false, tieBlockId = null, reason = null } = {}) {
+    return { entry, unresolved, tieBlockId, reason };
 }
 
 export function groupByComparator(sortedItems, comparator) {
@@ -101,17 +110,45 @@ export function findHeadToHeadWinner(playerAId, playerBId, finishedMatches) {
     return match?.winner ? String(match.winner) : null;
 }
 
-export function resolveTieBlock(entries, finishedMatches) {
-    if (entries.length <= 1) return [...entries];
+function resolveUnresolved(entries, nextTieBlockId, reason) {
+    const tieBlockId = `tie_${nextTieBlockId()}`;
+    return [...entries]
+        .sort(compareStable)
+        .map((entry) => makeResult(entry, { unresolved: true, tieBlockId, reason }));
+}
 
-    if (entries.length === 2) {
-        const [a, b] = entries;
-        const winner = findHeadToHeadWinner(a.player._id, b.player._id, finishedMatches);
-        if (winner === String(a.player._id)) return [a, b];
-        if (winner === String(b.player._id)) return [b, a];
-        return [...entries].sort(compareBySetPointAndName);
+function resolvePair(entries, directMatches, { allowOverallFallback, nextTieBlockId }) {
+    const [a, b] = entries;
+    const winner = findHeadToHeadWinner(a.player._id, b.player._id, directMatches);
+    if (winner === String(a.player._id)) return [makeResult(a), makeResult(b)];
+    if (winner === String(b.player._id)) return [makeResult(b), makeResult(a)];
+
+    if (allowOverallFallback) {
+        const overallDiff = compareBySetPoint(a, b);
+        if (overallDiff !== 0) {
+            return overallDiff < 0 ? [makeResult(a), makeResult(b)] : [makeResult(b), makeResult(a)];
+        }
     }
 
+    return resolveUnresolved(entries, nextTieBlockId, 'pair_unresolved');
+}
+
+function compareMiniDecorated(a, b, { useOverallFallback = false } = {}) {
+    const primary = compareByPrimaryStats(a.mini, b.mini);
+    if (primary !== 0) return primary;
+
+    const miniSetPoint = compareBySetPoint(a.mini, b.mini);
+    if (miniSetPoint !== 0) return miniSetPoint;
+
+    if (useOverallFallback) {
+        const overall = compareBySetPoint(a.entry, b.entry);
+        if (overall !== 0) return overall;
+    }
+
+    return 0;
+}
+
+function resolveMulti(entries, finishedMatches, options, nextTieBlockId) {
     const tiedPlayers = entries.map((entry) => entry.player);
     const tiedIds = new Set(tiedPlayers.map((p) => String(p._id)));
     const directMatches = finishedMatches.filter((m) => (
@@ -124,42 +161,50 @@ export function resolveTieBlock(entries, finishedMatches) {
         mini: miniStatsMap[String(entry.player._id)] ?? createEmptyStat(entry.player)
     }));
 
-    decorated.sort((x, y) => {
-        const primary = compareByPrimaryStats(x.mini, y.mini);
-        if (primary !== 0) return primary;
-        if (y.mini.setDiff !== x.mini.setDiff) return y.mini.setDiff - x.mini.setDiff;
-        if (y.mini.pointDiff !== x.mini.pointDiff) return y.mini.pointDiff - x.mini.pointDiff;
-        return 0;
-    });
+    decorated.sort((x, y) => compareMiniDecorated(x, y, { useOverallFallback: options.multiTiePolicy === 'direct_then_overall' }));
 
-    const grouped = groupByComparator(decorated, (x, y) => {
-        const primary = compareByPrimaryStats(x.mini, y.mini);
-        if (primary !== 0) return primary;
-        if (x.mini.setDiff !== y.mini.setDiff) return x.mini.setDiff - y.mini.setDiff;
-        if (x.mini.pointDiff !== y.mini.pointDiff) return x.mini.pointDiff - y.mini.pointDiff;
-        return 0;
-    });
+    const grouped = groupByComparator(decorated, (x, y) => compareMiniDecorated(x, y, { useOverallFallback: options.multiTiePolicy === 'direct_then_overall' }));
 
     const resolved = [];
     for (const block of grouped) {
-        if (block.length === 1) {
-            resolved.push(block[0].entry);
+        const blockEntries = block.map((x) => x.entry);
+
+        if (blockEntries.length === 1) {
+            resolved.push(makeResult(blockEntries[0]));
             continue;
         }
 
-        if (block.length === 2) {
-            const pairResolved = resolveTieBlock(block.map((x) => x.entry), directMatches);
-            resolved.push(...pairResolved);
+        if (blockEntries.length === 2) {
+            resolved.push(...resolvePair(blockEntries, directMatches, {
+                allowOverallFallback: options.multiTiePolicy === 'direct_then_overall',
+                nextTieBlockId
+            }));
             continue;
         }
 
-        resolved.push(...block.map((x) => x.entry).sort(compareBySetPointAndName));
+        if (options.multiTiePolicy === 'direct_then_overall') {
+            const byOverall = [...blockEntries].sort((a, b) => {
+                const diff = compareBySetPoint(a, b);
+                if (diff !== 0) return diff;
+                return compareStable(a, b);
+            });
+            const overallBlocks = groupByComparator(byOverall, (a, b) => compareBySetPoint(a, b));
+            for (const overallBlock of overallBlocks) {
+                if (overallBlock.length === 1) resolved.push(makeResult(overallBlock[0]));
+                else if (overallBlock.length === 2) resolved.push(...resolvePair(overallBlock, directMatches, { allowOverallFallback: true, nextTieBlockId }));
+                else resolved.push(...resolveUnresolved(overallBlock, nextTieBlockId, 'multi_unresolved_after_overall'));
+            }
+            continue;
+        }
+
+        resolved.push(...resolveUnresolved(blockEntries, nextTieBlockId, 'multi_unresolved_direct_only'));
     }
 
     return resolved;
 }
 
-export function computeStandings(groupPlayers, finishedMatches) {
+export function computeStandings(groupPlayers, finishedMatches, options = {}) {
+    const opts = defaultStandingOptions(options);
     const statsMap = buildStatsMap(groupPlayers, finishedMatches);
     const list = Object.values(statsMap);
 
@@ -167,11 +212,94 @@ export function computeStandings(groupPlayers, finishedMatches) {
 
     const grouped = groupByComparator(list, compareByPrimaryStats);
     const resolved = [];
+    let tieBlockSeq = 1;
+    const nextTieBlockId = () => tieBlockSeq++;
 
     for (const block of grouped) {
-        if (block.length === 1) resolved.push(block[0]);
-        else resolved.push(...resolveTieBlock(block, finishedMatches));
+        if (block.length === 1) {
+            resolved.push(makeResult(block[0]));
+            continue;
+        }
+
+        if (block.length === 2) {
+            resolved.push(...resolvePair(block, finishedMatches, {
+                allowOverallFallback: true,
+                nextTieBlockId
+            }));
+            continue;
+        }
+
+        resolved.push(...resolveMulti(block, finishedMatches, opts, nextTieBlockId));
     }
 
-    return resolved;
+    const standings = [];
+    let cursor = 1;
+    let idx = 0;
+
+    while (idx < resolved.length) {
+        const current = resolved[idx];
+        if (!current.unresolved || !current.tieBlockId) {
+            standings.push({
+                ...current.entry,
+                place: cursor,
+                tieResolved: true,
+                sharedPlace: false,
+                tieBlockId: null,
+                requiresManualResolution: false,
+                tieReason: null
+            });
+            cursor += 1;
+            idx += 1;
+            continue;
+        }
+
+        const blockId = current.tieBlockId;
+        const block = [];
+        while (idx < resolved.length && resolved[idx].tieBlockId === blockId) {
+            block.push(resolved[idx]);
+            idx += 1;
+        }
+
+        for (const item of block) {
+            standings.push({
+                ...item.entry,
+                place: cursor,
+                tieResolved: false,
+                sharedPlace: opts.unresolvedTiePolicy === 'shared_place',
+                tieBlockId: blockId,
+                requiresManualResolution: opts.unresolvedTiePolicy === 'manual_override',
+                tieReason: item.reason ?? null
+            });
+        }
+        cursor += block.length;
+    }
+
+    const blockSizes = standings.reduce((acc, entry) => {
+        if (!entry.tieBlockId) return acc;
+        acc[entry.tieBlockId] = (acc[entry.tieBlockId] ?? 0) + 1;
+        return acc;
+    }, {});
+
+    return standings.map((entry) => ({
+        ...entry,
+        tieBlockSize: entry.tieBlockId ? (blockSizes[entry.tieBlockId] ?? 1) : 1
+    }));
+}
+
+export function findCutoffTieBlock(standings, cutoffCount) {
+    if (!Array.isArray(standings) || cutoffCount < 1 || standings.length < cutoffCount) return null;
+    const cutoffEntry = standings[cutoffCount - 1];
+    if (!cutoffEntry?.tieBlockId) return null;
+
+    const tieBlock = standings.filter((entry) => entry.tieBlockId === cutoffEntry.tieBlockId);
+    if (tieBlock.length === 0) return null;
+
+    const startIndex = standings.findIndex((entry) => entry.tieBlockId === cutoffEntry.tieBlockId);
+    const endIndex = standings.length - 1 - [...standings].reverse().findIndex((entry) => entry.tieBlockId === cutoffEntry.tieBlockId);
+
+    if (startIndex < cutoffCount && endIndex >= cutoffCount) {
+        return tieBlock;
+    }
+
+    return null;
 }

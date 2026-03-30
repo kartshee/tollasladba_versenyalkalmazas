@@ -174,7 +174,7 @@ router.get('/groups/:groupId/standings.csv', async (req, res) => {
     const { group, tournament } = await loadOwnedGroup(groupId, req.user._id, { populatePlayers: true });
     if (!group || !tournament) return res.status(404).json({ error: 'Group not found' });
 
-    const category = await Category.findById(group.categoryId).select('name').lean();
+    const category = await Category.findById(group.categoryId).select('name multiTiePolicy unresolvedTiePolicy').lean();
 
     const matches = await Match.find({
         groupId: group._id,
@@ -184,10 +184,14 @@ router.get('/groups/:groupId/standings.csv', async (req, res) => {
         voided: { $ne: true }
     }).lean();
 
-    const standings = computeStandings(group.players, matches);
+    const standings = computeStandings(group.players, matches, {
+        multiTiePolicy: category?.multiTiePolicy ?? 'direct_then_overall',
+        unresolvedTiePolicy: category?.unresolvedTiePolicy ?? 'shared_place'
+    });
 
     const rows = [[
         'position',
+        'tieResolved',
         'tournamentName',
         'categoryName',
         'groupName',
@@ -202,7 +206,8 @@ router.get('/groups/:groupId/standings.csv', async (req, res) => {
 
     standings.forEach((entry, index) => {
         rows.push([
-            index + 1,
+            entry.place ?? index + 1,
+            entry.tieResolved === false ? 'false' : 'true',
             tournament.name,
             category?.name ?? '',
             group.name ?? '',

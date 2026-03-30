@@ -5,6 +5,7 @@ import Tournament from '../models/Tournament.js';
 import Category from '../models/Category.js';
 import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
+import { ensureEntryForPlayer } from '../services/entry.service.js';
 
 const router = Router();
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -52,6 +53,8 @@ router.post('/', async (req, res) => {
             checkedInAt: null,
             mainEligibility: 'main'
         });
+
+        await ensureEntryForPlayer({ tournament: t, player, categoryId: normalizedCategoryId });
 
         await safeRecordAuditEvent({
             userId: req.user._id,

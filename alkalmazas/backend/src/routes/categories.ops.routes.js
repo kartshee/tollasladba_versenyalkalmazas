@@ -7,6 +7,8 @@ import Match from '../models/Match.js';
 import { generatePartialRoundRobin, recommendMatchesPerPlayer } from '../services/roundRobin.service.js';
 import { assertTournamentOwned } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
+import { ensureEntryForPlayer } from '../services/entry.service.js';
+import { buildSeededBracketPairs, findLatestGeneratedPlayoffRound, getInitialPlayoffRoundName, getNextPlayoffRoundName, getPlayoffRoundSize, isSupportedPlayoffSize, sortPlayoffRounds } from '../services/playoff.service.js';
 
 const router = Router();
 
@@ -15,6 +17,15 @@ const makePairKey = (a, b) => {
     const y = String(b);
     return x < y ? `${x}_${y}` : `${y}_${x}`;
 };
+
+function shuffle(arr) {
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+}
 
 async function loadOwnedCategory(categoryId, userId) {
     const category = await Category.findById(categoryId);
@@ -45,6 +56,114 @@ function parseBulk(text) {
         .filter((x) => x.name);
 }
 
+function createPlayoffDocs({ category, groupId = null, players, drawVersion }) {
+    const shuffled = shuffle(players);
+    const round = getInitialPlayoffRoundName(shuffled.length);
+    if (!round) throw new Error(`Unsupported playoff size: ${shuffled.length}`);
+
+    const pairs = buildSeededBracketPairs(shuffled);
+    return pairs.map((pair) => ({
+        tournamentId: category.tournamentId,
+        categoryId: category._id,
+        groupId,
+        player1: pair.player1._id ?? pair.player1,
+        player2: pair.player2._id ?? pair.player2,
+        pairKey: makePairKey(pair.player1._id ?? pair.player1, pair.player2._id ?? pair.player2),
+        round,
+        status: 'pending',
+        roundNumber: pair.bracketSlot,
+        drawVersion,
+        resultType: 'played',
+        voided: false,
+        voidReason: '',
+        voidedAt: null,
+        courtNumber: null,
+        startAt: null,
+        endAt: null,
+        actualStartAt: null,
+        actualEndAt: null,
+        resultUpdatedAt: null,
+        umpireName: '',
+        sets: [],
+        winner: null
+    }));
+}
+
+function findAdvancableRound(matches) {
+    const rounds = [...new Set(matches.map((m) => m.round))].sort(sortPlayoffRounds);
+    const sizes = new Set(rounds.map((round) => getPlayoffRoundSize(round)).filter(Boolean));
+    const candidates = [...sizes].sort((a, b) => a - b);
+    for (const size of candidates) {
+        if (size <= 2) continue;
+        if (sizes.has(size) && !sizes.has(size / 2)) {
+            return { currentRound: [...rounds].find((r) => getPlayoffRoundSize(r) === size), nextRound: getNextPlayoffRoundName([...rounds].find((r) => getPlayoffRoundSize(r) === size)) };
+        }
+    }
+    return null;
+}
+
+async function advancePlayoffMatches({ category, groupId = null }) {
+    const filter = { categoryId: category._id, voided: { $ne: true } };
+    if (groupId) filter.groupId = groupId;
+    else filter.groupId = null;
+
+    const matches = await Match.find(filter).sort({ roundNumber: 1, createdAt: 1 }).lean();
+    const playoffMatches = matches.filter((m) => getPlayoffRoundSize(m.round));
+    if (playoffMatches.length === 0) {
+        throw new Error('No playoff matches generated yet');
+    }
+
+    const existingFinal = playoffMatches.find((m) => m.round === 'playoff_final');
+    if (existingFinal) {
+        throw new Error('Playoff final already exists');
+    }
+
+    const adv = findAdvancableRound(playoffMatches);
+    if (!adv) {
+        throw new Error('No playoff round can be advanced right now');
+    }
+
+    const currentMatches = playoffMatches.filter((m) => m.round === adv.currentRound).sort((a, b) => (a.roundNumber ?? 0) - (b.roundNumber ?? 0));
+    const notFinished = currentMatches.filter((m) => !m.winner);
+    if (notFinished.length > 0) {
+        throw new Error(`Current playoff round is not finished (${adv.currentRound})`);
+    }
+
+    const created = await Match.insertMany(currentMatches.reduce((acc, match, idx, arr) => {
+        if (idx % 2 === 1) return acc;
+        const other = arr[idx + 1];
+        if (!other) return acc;
+        acc.push({
+            tournamentId: category.tournamentId,
+            categoryId: category._id,
+            groupId,
+            player1: match.winner,
+            player2: other.winner,
+            pairKey: makePairKey(match.winner, other.winner),
+            round: adv.nextRound,
+            status: 'pending',
+            roundNumber: Math.floor(idx / 2) + 1,
+            drawVersion: Number(category.drawVersion ?? 1),
+            resultType: 'played',
+            voided: false,
+            voidReason: '',
+            voidedAt: null,
+            courtNumber: null,
+            startAt: null,
+            endAt: null,
+            actualStartAt: null,
+            actualEndAt: null,
+            resultUpdatedAt: null,
+            umpireName: '',
+            sets: [],
+            winner: null
+        });
+        return acc;
+    }, []));
+
+    return created;
+}
+
 router.post('/:id/players', async (req, res) => {
     const { category, tournament: t } = await loadOwnedCategory(req.params.id, req.user._id);
     if (!category) return res.status(404).json({ error: 'Category not found' });
@@ -64,6 +183,8 @@ router.post('/:id/players', async (req, res) => {
         checkedInAt: null,
         mainEligibility: locked ? 'friendly_only' : 'main'
     });
+
+    await ensureEntryForPlayer({ tournament: t, player, categoryId: category._id });
 
     await safeRecordAuditEvent({
         userId: req.user._id,
@@ -105,6 +226,9 @@ router.post('/:id/players/bulk', async (req, res) => {
     }));
 
     const created = await Player.insertMany(docs, { ordered: true });
+    for (const player of created) {
+        await ensureEntryForPlayer({ tournament: t, player, categoryId: category._id });
+    }
 
     await safeRecordAuditEvent({
         userId: req.user._id,
@@ -181,6 +305,49 @@ router.post('/:id/finalize-draw', async (req, res) => {
         return res.status(400).json({ error: 'Not enough players', players: players.length });
     }
 
+    const drawVersion = Number(category.drawVersion ?? 1);
+
+    if (category.format === 'playoff') {
+        const playoffSize = Number(category.playoffSize ?? players.length);
+        if (!isSupportedPlayoffSize(playoffSize)) {
+            return res.status(400).json({ error: 'Unsupported playoffSize', playoffSize });
+        }
+        if (players.length !== playoffSize) {
+            return res.status(400).json({ error: 'Player count must exactly match playoffSize for playoff-only categories', players: players.length, playoffSize });
+        }
+
+        const docs = createPlayoffDocs({ category, groupId: null, players, drawVersion });
+        const created = await Match.insertMany(docs, { ordered: true });
+
+        const before = pickAuditFields(category, AUDIT_SNAPSHOT_FIELDS.category);
+        category.status = 'draw_locked';
+        category.drawLockedAt = new Date();
+        await category.save();
+
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: category.tournamentId,
+            categoryId: category._id,
+            entityType: 'category',
+            entityId: category._id,
+            action: 'category.playoff_draw_finalized',
+            summary: `Playoff bracket finalized for ${category.name}`,
+            before,
+            after: pickAuditFields(category, AUDIT_SNAPSHOT_FIELDS.category),
+            metadata: { generatedMatches: created.length, playoffSize, round: getInitialPlayoffRoundName(playoffSize), drawVersion }
+        });
+
+        return res.json({
+            categoryId: String(category._id),
+            groupsCreated: 0,
+            generatedMatches: created.length,
+            drawVersion,
+            playoffSize,
+            round: getInitialPlayoffRoundName(playoffSize),
+            warnings: []
+        });
+    }
+
     const groupSizeTarget = Number(category.groupSizeTarget ?? 8);
     let groupsCount = Number(category.groupsCount ?? 1);
     if (groupsCount <= 1) {
@@ -207,7 +374,6 @@ router.post('/:id/finalize-draw', async (req, res) => {
 
     const warnings = [];
     let totalGenerated = 0;
-    const drawVersion = Number(category.drawVersion ?? 1);
 
     for (const g of groups) {
         const ids = g.players.map(String);
@@ -258,6 +424,7 @@ router.post('/:id/finalize-draw', async (req, res) => {
             actualStartAt: null,
             actualEndAt: null,
             resultUpdatedAt: null,
+            umpireName: '',
             sets: [],
             winner: null
         }));
@@ -302,6 +469,36 @@ router.post('/:id/finalize-draw', async (req, res) => {
     });
 });
 
+router.post('/:id/playoff/advance', async (req, res) => {
+    const { category } = await loadOwnedCategory(req.params.id, req.user._id);
+    if (!category) return res.status(404).json({ error: 'Category not found' });
+    if (category.format !== 'playoff') return res.status(400).json({ error: 'Category format is not playoff' });
+
+    try {
+        const created = await advancePlayoffMatches({ category, groupId: null });
+        const populated = await Match.find({ _id: { $in: created.map((m) => m._id) } })
+            .sort({ roundNumber: 1, createdAt: 1 })
+            .populate('player1', 'name')
+            .populate('player2', 'name')
+            .populate('winner', 'name');
+
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: category.tournamentId,
+            categoryId: category._id,
+            entityType: 'category',
+            entityId: category._id,
+            action: 'category.playoff_advanced',
+            summary: `Playoff advanced for ${category.name}`,
+            metadata: { createdMatchIds: created.map((m) => String(m._id)) }
+        });
+
+        res.status(201).json({ created: populated.length, matches: populated });
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
+});
+
 router.post('/:id/close-grace', async (req, res) => {
     const { category, tournament: t } = await loadOwnedCategory(req.params.id, req.user._id);
     if (!category) return res.status(404).json({ error: 'Category not found' });
@@ -333,8 +530,16 @@ router.post('/:id/close-grace', async (req, res) => {
     await Player.updateMany({ _id: { $in: absentIds } }, { $set: { mainEligibility: 'friendly_only' } });
 
     const drawVersion = Number(category.drawVersion ?? 1);
-    const voidRes = await Match.updateMany(
-        {
+    const matchFilter = category.format === 'playoff'
+        ? {
+            tournamentId: category.tournamentId,
+            categoryId: category._id,
+            drawVersion,
+            status: { $ne: 'finished' },
+            voided: { $ne: true },
+            $or: [{ player1: { $in: absentIds } }, { player2: { $in: absentIds } }]
+        }
+        : {
             tournamentId: category.tournamentId,
             categoryId: category._id,
             round: 'group',
@@ -342,7 +547,10 @@ router.post('/:id/close-grace', async (req, res) => {
             status: { $ne: 'finished' },
             voided: { $ne: true },
             $or: [{ player1: { $in: absentIds } }, { player2: { $in: absentIds } }]
-        },
+        };
+
+    const voidRes = await Match.updateMany(
+        matchFilter,
         {
             $set: {
                 voided: true,
@@ -355,28 +563,30 @@ router.post('/:id/close-grace', async (req, res) => {
         }
     );
 
-    const groups = await Group.find({ categoryId: category._id }).select('_id players').lean();
-    for (const g of groups) {
-        const inGroup = new Set(g.players.map(String));
-        const affected = absentIds.filter((pid) => inGroup.has(String(pid)));
-        if (affected.length === 0) continue;
+    if (category.format !== 'playoff') {
+        const groups = await Group.find({ categoryId: category._id }).select('_id players').lean();
+        for (const g of groups) {
+            const inGroup = new Set(g.players.map(String));
+            const affected = absentIds.filter((pid) => inGroup.has(String(pid)));
+            if (affected.length === 0) continue;
 
-        await Group.updateOne(
-            { _id: g._id },
-            {
-                $push: {
-                    withdrawals: {
-                        $each: affected.map((pid) => ({
-                            playerId: pid,
-                            reason: 'no_show',
-                            policy: 'delete_results',
-                            note: 'auto close grace',
-                            at: now
-                        }))
+            await Group.updateOne(
+                { _id: g._id },
+                {
+                    $push: {
+                        withdrawals: {
+                            $each: affected.map((pid) => ({
+                                playerId: pid,
+                                reason: 'no_show',
+                                policy: 'delete_results',
+                                note: 'auto close grace',
+                                at: now
+                            }))
+                        }
                     }
                 }
-            }
-        );
+            );
+        }
     }
 
     await safeRecordAuditEvent({
@@ -446,6 +656,7 @@ router.post('/:id/friendly-match', async (req, res) => {
         actualStartAt: null,
         actualEndAt: null,
         resultUpdatedAt: null,
+        umpireName: '',
         sets: [],
         winner: null
     });

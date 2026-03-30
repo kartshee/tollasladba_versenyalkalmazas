@@ -42,6 +42,8 @@ const matchSchema = new mongoose.Schema(
         actualEndAt: { type: Date, default: null },
         resultUpdatedAt: { type: Date, default: null },
 
+        umpireName: { type: String, trim: true, default: '' },
+
         sets: { type: [setSchema], default: [] },
         winner: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', default: null }
     },
@@ -49,6 +51,7 @@ const matchSchema = new mongoose.Schema(
 );
 
 // UNIQUE: azonos drawVersion-ön belül ne legyen duplikált pár ugyanabban a group/round-ban
-matchSchema.index({ groupId: 1, round: 1, drawVersion: 1, pairKey: 1 }, { unique: true });
+matchSchema.index({ groupId: 1, round: 1, drawVersion: 1, pairKey: 1 }, { unique: true, partialFilterExpression: { groupId: { $type: 'objectId' } } });
+matchSchema.index({ categoryId: 1, round: 1, drawVersion: 1, pairKey: 1 }, { unique: true, partialFilterExpression: { groupId: null } });
 
 export default mongoose.model('Match', matchSchema);

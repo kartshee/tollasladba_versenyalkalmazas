@@ -195,6 +195,43 @@ router.post('/group/:groupId', async (req, res) => {
     }
 });
 
+
+router.patch('/:matchId/umpire', async (req, res) => {
+    const { match } = await loadOwnedMatch(req.params.matchId, req.user._id);
+    if (!match) return res.status(404).json({ error: 'Match not found' });
+    if (match.voided) return res.status(409).json({ error: 'Cannot assign umpire to a voided match' });
+
+    const { umpireName = '' } = req.body ?? {};
+    if (typeof umpireName !== 'string') {
+        return res.status(400).json({ error: 'umpireName must be a string' });
+    }
+
+    const before = pickAuditFields(match, AUDIT_SNAPSHOT_FIELDS.match);
+    match.umpireName = umpireName.trim();
+    await match.save();
+
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: match.tournamentId,
+        categoryId: match.categoryId,
+        groupId: match.groupId,
+        matchId: match._id,
+        entityType: 'match',
+        entityId: match._id,
+        action: 'match.umpire_updated',
+        summary: match.umpireName ? `Umpire assigned: ${match.umpireName}` : 'Umpire cleared',
+        before,
+        after: pickAuditFields(match, AUDIT_SNAPSHOT_FIELDS.match)
+    });
+
+    const populated = await Match.findById(match._id)
+        .populate('player1', 'name')
+        .populate('player2', 'name')
+        .populate('winner', 'name');
+
+    res.json(populated);
+});
+
 router.patch('/:matchId/status', async (req, res) => {
     if (!req.is('application/json')) {
         return res.status(400).json({ error: 'Content-Type must be application/json' });
@@ -366,10 +403,10 @@ router.post('/group/:groupId/schedule', async (req, res) => {
         const { group } = await loadOwnedGroup(req.params.groupId, req.user._id);
         if (!group) return res.status(404).json({ error: 'Group not found' });
 
-        const filter = { groupId: req.params.groupId, round: 'group', status: 'pending', voided: { $ne: true } };
+        const filter = { groupId: req.params.groupId, round: { $ne: 'friendly' }, status: 'pending', voided: { $ne: true } };
         if (!force) filter.startAt = null;
 
-        const toSchedule = await Match.find(filter).select('_id player1 player2 createdAt').sort({ roundNumber: 1, createdAt: 1 }).lean();
+        const toSchedule = await Match.find(filter).select('_id player1 player2 round roundNumber createdAt').sort({ roundNumber: 1, createdAt: 1 }).lean();
         if (toSchedule.length === 0) return res.json({ scheduled: 0, message: 'No matches to schedule with current filter' });
 
         const ids = new Set();
@@ -404,7 +441,7 @@ router.post('/group/:groupId/schedule', async (req, res) => {
             metadata: { scheduled: plan.length, startAt: parsedStart, courtsCount: cCount, matchMinutes: mMin, playerRestMinutes: restMin, courtTurnoverMinutes: turnoverMin, force: force === true }
         });
 
-        const updated = await Match.find({ groupId: req.params.groupId, round: 'group' })
+        const updated = await Match.find({ groupId: req.params.groupId, round: { $ne: 'friendly' } })
             .sort({ startAt: 1, createdAt: 1 })
             .populate('player1', 'name')
             .populate('player2', 'name')
@@ -439,7 +476,7 @@ router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
         if (!Number.isFinite(turnoverMin) || turnoverMin < 0 || turnoverMin > 120) return res.status(400).json({ error: 'courtTurnoverMinutes must be between 0 and 120' });
         if (!Number.isInteger(fairGap) || fairGap < 0 || fairGap > 5) return res.status(400).json({ error: 'fairnessGap must be an integer between 0 and 5' });
 
-        const filter = { tournamentId: req.params.tournamentId, round: 'group', status: 'pending', voided: { $ne: true } };
+        const filter = { tournamentId: req.params.tournamentId, round: { $ne: 'friendly' }, status: 'pending', voided: { $ne: true } };
         if (!force) filter.startAt = null;
 
         const toSchedule = await Match.find(filter)
@@ -447,7 +484,7 @@ router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
             .sort({ categoryId: 1, roundNumber: 1, createdAt: 1 })
             .lean();
 
-        if (toSchedule.length === 0) return res.json({ scheduled: 0, message: 'No group matches to schedule with current filter' });
+        if (toSchedule.length === 0) return res.json({ scheduled: 0, message: 'No matches to schedule with current filter' });
 
         const playerIds = new Set();
         toSchedule.forEach((m) => { playerIds.add(String(m.player1)); playerIds.add(String(m.player2)); });
@@ -455,7 +492,7 @@ router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
         const okPlayers = new Set(players.filter((p) => p.checkedInAt && p.mainEligibility === 'main').map((p) => String(p._id)));
         const filtered = toSchedule.filter((m) => okPlayers.has(String(m.player1)) && okPlayers.has(String(m.player2)));
         if (filtered.length === 0) {
-            return res.json({ scheduled: 0, message: 'No schedulable group matches: require both players checked-in and main-eligible' });
+            return res.json({ scheduled: 0, message: 'No schedulable matches: require both players checked-in and main-eligible' });
         }
 
         const scheduledIds = filtered.map((m) => m._id);
@@ -481,7 +518,7 @@ router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
         const ops = plan.map((pp) => ({ updateOne: { filter: { _id: pp.matchId, status: 'pending' }, update: { $set: { startAt: pp.startAt, endAt: pp.endAt, courtNumber: pp.courtNumber } } } }));
         if (ops.length > 0) await Match.bulkWrite(ops);
 
-        const updated = await Match.find({ tournamentId: req.params.tournamentId, round: 'group' })
+        const updated = await Match.find({ tournamentId: req.params.tournamentId, round: { $ne: 'friendly' } })
             .sort({ startAt: 1, createdAt: 1 })
             .populate('categoryId', 'name')
             .populate('player1', 'name')

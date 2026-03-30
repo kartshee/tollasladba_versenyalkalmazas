@@ -3,15 +3,16 @@ import { createAuthContext } from './_auth.js';
 
 let j;
 
-
-async function setupCategory({ tournamentId, name, playerNames, matchesPerPlayer }) {
+async function setupCategory({ tournamentId, name, playerNames, matchesPerPlayer = 3, multiTiePolicy = 'direct_then_overall', unresolvedTiePolicy = 'shared_place' }) {
     const category = await j('POST', '/api/categories', {
         tournamentId,
         name,
         groupStageMatchesPerPlayer: matchesPerPlayer,
         groupSizeTarget: playerNames.length,
         groupsCount: 1,
-        format: 'group'
+        format: 'group',
+        multiTiePolicy,
+        unresolvedTiePolicy
     });
     assert(category?._id);
 
@@ -78,57 +79,58 @@ async function playWinner(match, winnerName, winnerScores = [21, 21], loserScore
     return setPlayed(match._id, sets);
 }
 
-async function runThreeWayTieScenario(tournamentId) {
+async function runThreeWayPolicyScenario(tournamentId) {
     const names = ['A', 'B', 'C', 'D'];
     const { group, matches } = await setupCategory({
         tournamentId,
         name: `TB-3WAY ${new Date().toISOString()}`,
         playerNames: names,
-        matchesPerPlayer: 3
+        matchesPerPlayer: 3,
+        multiTiePolicy: 'direct_then_overall',
+        unresolvedTiePolicy: 'shared_place'
     });
 
     const pick = makeMatchLookup(matches);
 
-    await playWinner(pick('A', 'B'), 'A', [21, 21], [10, 10]);
-    await playWinner(pick('B', 'C'), 'B', [21, 21], [19, 19]);
-    await playWinner(pick('C', 'A'), 'C', [21, 21], [19, 19]);
+    await playWinner(pick('A', 'B'), 'A', [21, 21], [18, 18]);
+    await playWinner(pick('B', 'C'), 'B', [21, 21], [18, 18]);
+    await playWinner(pick('C', 'A'), 'C', [21, 21], [18, 18]);
     await playWinner(pick('A', 'D'), 'A', [21, 21], [5, 5]);
-    await playWinner(pick('B', 'D'), 'B', [21, 21], [6, 6]);
-    await playWinner(pick('C', 'D'), 'C', [21, 21], [7, 7]);
+    await playWinner(pick('B', 'D'), 'B', [21, 21], [10, 10]);
+    await playWinner(pick('C', 'D'), 'C', [21, 21], [15, 15]);
 
     const standings = await j('GET', `/api/groups/${group._id}/standings`);
     const order = standings.map((s) => s.player.name);
 
-    assert.deepEqual(order, ['A', 'C', 'B', 'D']);
+    assert.deepEqual(order, ['A', 'B', 'C', 'D']);
+    assert.equal(standings[0].tieResolved, true);
 
     return { order };
 }
 
-async function runHeadToHeadScenario(tournamentId) {
-    const names = ['E', 'F', 'G', 'H'];
+async function runSharedPlaceScenario(tournamentId) {
+    const names = ['E', 'F', 'G'];
     const { group, matches } = await setupCategory({
         tournamentId,
-        name: `TB-H2H ${new Date().toISOString()}`,
+        name: `TB-SHARED ${new Date().toISOString()}`,
         playerNames: names,
-        matchesPerPlayer: 3
+        matchesPerPlayer: 2,
+        multiTiePolicy: 'direct_only',
+        unresolvedTiePolicy: 'shared_place'
     });
 
     const pick = makeMatchLookup(matches);
-
-    await playWinner(pick('E', 'F'), 'E', [21, 21], [18, 18]);
-    await playWinner(pick('E', 'G'), 'E', [21, 21], [11, 11]);
-    await playWinner(pick('H', 'E'), 'H', [21, 21], [19, 19]);
-    await playWinner(pick('F', 'G'), 'F', [21, 21], [17, 17]);
-    await playWinner(pick('F', 'H'), 'F', [21, 21], [17, 17]);
-    await playWinner(pick('G', 'H'), 'G', [21, 21], [19, 19]);
+    await playWinner(pick('E', 'F'), 'E', [21, 21], [19, 19]);
+    await playWinner(pick('F', 'G'), 'F', [21, 21], [19, 19]);
+    await playWinner(pick('E', 'G'), 'G', [21, 21], [19, 19]);
 
     const standings = await j('GET', `/api/groups/${group._id}/standings`);
-    const order = standings.map((s) => s.player.name);
+    assert.equal(standings[0].place, 1);
+    assert.equal(standings[1].place, 1);
+    assert.equal(standings[2].place, 1);
+    assert.equal(standings[0].tieResolved, false);
 
-    assert.deepEqual(order.slice(0, 2), ['E', 'F']);
-    assert.equal(standings[0].wins, standings[1].wins);
-
-    return { order };
+    return { order: standings.map((s) => s.player.name), place: standings[0].place };
 }
 
 async function main() {
@@ -139,14 +141,14 @@ async function main() {
     });
     assert(tournament?._id);
 
-    const threeWay = await runThreeWayTieScenario(tournament._id);
-    const headToHead = await runHeadToHeadScenario(tournament._id);
+    const threeWay = await runThreeWayPolicyScenario(tournament._id);
+    const shared = await runSharedPlaceScenario(tournament._id);
 
     console.log('OK: standings tie-break smoke passed');
     console.log({
         tournamentId: tournament._id,
         threeWayOrder: threeWay.order,
-        headToHeadOrder: headToHead.order
+        shared
     });
 }
 

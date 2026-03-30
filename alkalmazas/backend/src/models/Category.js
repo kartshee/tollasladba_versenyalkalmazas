@@ -44,13 +44,26 @@ const categorySchema = new mongoose.Schema(
             default: 'delete_results'
         },
 
+        multiTiePolicy: {
+            type: String,
+            enum: ['direct_only', 'direct_then_overall'],
+            default: 'direct_then_overall'
+        },
+
+        unresolvedTiePolicy: {
+            type: String,
+            enum: ['shared_place', 'manual_override'],
+            default: 'shared_place'
+        },
+
         gender: { type: String, enum: ['male', 'female', 'mixed', 'other'], default: 'other' },
         ageGroup: { type: String },
-        format: { type: String, enum: ['group', 'group+playoff'], default: 'group+playoff' },
+        format: { type: String, enum: ['group', 'group+playoff', 'playoff'], default: 'group+playoff' },
 
         // ha 1, auto számoljuk groupSizeTarget alapján
         groupsCount: { type: Number, default: 1, min: 1 },
-        qualifiersPerGroup: { type: Number, default: 4, min: 1 }
+        qualifiersPerGroup: { type: Number, default: 4, min: 1 },
+        playoffSize: { type: Number, default: null, min: 2 }
     },
     { timestamps: true }
 );

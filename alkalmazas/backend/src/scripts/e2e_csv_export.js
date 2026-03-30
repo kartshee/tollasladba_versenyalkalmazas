@@ -96,7 +96,7 @@ async function main() {
     const standingsCsv = await fetchText(`/api/exports/groups/${groupId}/standings.csv`, auth.token);
     assert(standingsCsv.contentType.includes('text/csv'));
     assert(standingsCsv.disposition.includes('standings.csv'));
-    assert(standingsCsv.text.includes('position,tournamentName,categoryName,groupName'));
+    assert(standingsCsv.text.includes('position,tieResolved,tournamentName,categoryName,groupName'))
     assert(standingsCsv.text.includes('CSV P1') || standingsCsv.text.includes('CSV P2'));
 
     console.log('OK: csv export smoke passed');

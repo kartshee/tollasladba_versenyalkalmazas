@@ -1,4 +1,5 @@
 import { assertValidMatchRulesConfig } from './badmintonRules.service.js';
+import { SUPPORTED_PLAYOFF_SIZES } from './playoff.service.js';
 
 function parseIntField(value, fieldName, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER } = {}) {
     const n = Number(value);
@@ -27,6 +28,15 @@ function parseEnumField(value, fieldName, allowed) {
     return value;
 }
 
+function parsePlayoffSizeOrNull(value, fieldName) {
+    if (value === undefined || value === null || value === '') return null;
+    const parsed = parseIntField(value, fieldName, { min: 2, max: 64 });
+    if (!SUPPORTED_PLAYOFF_SIZES.includes(parsed)) {
+        throw new Error(`${fieldName} must be one of: ${SUPPORTED_PLAYOFF_SIZES.join(', ')}`);
+    }
+    return parsed;
+}
+
 export function normalizeTournamentConfig(raw = {}, { partial = false } = {}) {
     const source = raw ?? {};
     const out = partial ? {} : {
@@ -38,7 +48,9 @@ export function normalizeTournamentConfig(raw = {}, { partial = false } = {}) {
         courtsCount: 1,
         checkInGraceMinutesDefault: 40,
         lateNoShowPolicy: 'void',
-        avoidSameClubEarly: false
+        avoidSameClubEarly: false,
+        entryFeeEnabled: false,
+        entryFeeAmount: 0
     };
 
     if (!partial || Object.prototype.hasOwnProperty.call(source, 'matchRules')) {
@@ -67,6 +79,22 @@ export function normalizeTournamentConfig(raw = {}, { partial = false } = {}) {
     }
     if (!partial || Object.prototype.hasOwnProperty.call(source, 'avoidSameClubEarly')) {
         out.avoidSameClubEarly = parseBooleanField(source.avoidSameClubEarly ?? false, 'config.avoidSameClubEarly');
+    }
+    if (!partial || Object.prototype.hasOwnProperty.call(source, 'entryFeeEnabled')) {
+        out.entryFeeEnabled = parseBooleanField(source.entryFeeEnabled ?? false, 'config.entryFeeEnabled');
+    }
+    if (!partial || Object.prototype.hasOwnProperty.call(source, 'entryFeeAmount')) {
+        const amount = Number(source.entryFeeAmount ?? 0);
+        if (!Number.isFinite(amount) || amount < 0 || amount > 1000000) {
+            throw new Error('config.entryFeeAmount must be a number between 0 and 1000000');
+        }
+        out.entryFeeAmount = amount;
+    }
+
+    const enabled = out.entryFeeEnabled ?? source.entryFeeEnabled ?? false;
+    const amount = out.entryFeeAmount ?? source.entryFeeAmount ?? 0;
+    if (enabled && Number(amount) <= 0) {
+        throw new Error('config.entryFeeAmount must be greater than 0 when entryFeeEnabled=true');
     }
 
     return out;
@@ -132,32 +160,67 @@ export function normalizeCategoryPayload(raw = {}, { partial = false } = {}) {
     if (Object.prototype.hasOwnProperty.call(source, 'incompletePolicy')) {
         out.incompletePolicy = parseEnumField(source.incompletePolicy, 'incompletePolicy', ['delete_results', 'keep_results']);
     }
+    if (Object.prototype.hasOwnProperty.call(source, 'multiTiePolicy')) {
+        out.multiTiePolicy = parseEnumField(source.multiTiePolicy, 'multiTiePolicy', ['direct_only', 'direct_then_overall']);
+    }
+    if (Object.prototype.hasOwnProperty.call(source, 'unresolvedTiePolicy')) {
+        out.unresolvedTiePolicy = parseEnumField(source.unresolvedTiePolicy, 'unresolvedTiePolicy', ['shared_place', 'manual_override']);
+    }
     if (Object.prototype.hasOwnProperty.call(source, 'gender')) {
         out.gender = parseEnumField(source.gender, 'gender', ['male', 'female', 'mixed', 'other']);
     }
     if (Object.prototype.hasOwnProperty.call(source, 'ageGroup')) {
-        out.ageGroup = source.ageGroup ?? '';
+        out.ageGroup = typeof source.ageGroup === 'string' ? source.ageGroup.trim() : source.ageGroup;
     }
-    if (!partial || Object.prototype.hasOwnProperty.call(source, 'format')) {
-        out.format = parseEnumField(source.format ?? 'group+playoff', 'format', ['group', 'group+playoff']);
+    if (Object.prototype.hasOwnProperty.call(source, 'format')) {
+        out.format = parseEnumField(source.format ?? 'group+playoff', 'format', ['group', 'group+playoff', 'playoff']);
+    } else if (!partial) {
+        out.format = 'group+playoff';
     }
     if (!partial || Object.prototype.hasOwnProperty.call(source, 'groupsCount')) {
-        out.groupsCount = parseIntField(source.groupsCount ?? 1, 'groupsCount', { min: 1, max: 64 });
+        out.groupsCount = parseIntField(source.groupsCount ?? 1, 'groupsCount', { min: 1, max: 32 });
     }
     if (!partial || Object.prototype.hasOwnProperty.call(source, 'qualifiersPerGroup')) {
         out.qualifiersPerGroup = parseIntField(source.qualifiersPerGroup ?? 4, 'qualifiersPerGroup', { min: 1, max: 64 });
     }
-
-    const format = out.format ?? source.format;
-    const qualifiersPerGroup = out.qualifiersPerGroup ?? source.qualifiersPerGroup;
-    const groupSizeTarget = out.groupSizeTarget ?? source.groupSizeTarget;
-
-    if (format === 'group+playoff' && qualifiersPerGroup !== undefined && ![2, 4].includes(Number(qualifiersPerGroup))) {
-        throw new Error('qualifiersPerGroup must be 2 or 4 when format=group+playoff');
+    if (Object.prototype.hasOwnProperty.call(source, 'playoffSize') || !partial) {
+        out.playoffSize = parsePlayoffSizeOrNull(source.playoffSize ?? null, 'playoffSize');
     }
 
-    if (format === 'group+playoff' && qualifiersPerGroup !== undefined && groupSizeTarget !== undefined && Number(qualifiersPerGroup) > Number(groupSizeTarget)) {
-        throw new Error('qualifiersPerGroup cannot be greater than groupSizeTarget');
+    const format = out.format ?? source.format ?? 'group+playoff';
+    const qualifiersPerGroup = out.qualifiersPerGroup ?? source.qualifiersPerGroup;
+    const groupSizeTarget = out.groupSizeTarget ?? source.groupSizeTarget ?? 8;
+    const playoffSize = out.playoffSize ?? source.playoffSize ?? null;
+
+    if (format === 'group+playoff') {
+        if (qualifiersPerGroup !== undefined && !SUPPORTED_PLAYOFF_SIZES.includes(Number(qualifiersPerGroup))) {
+            throw new Error(`qualifiersPerGroup must be one of ${SUPPORTED_PLAYOFF_SIZES.join(', ')} when format=group+playoff`);
+        }
+        if (qualifiersPerGroup !== undefined && groupSizeTarget !== undefined && Number(qualifiersPerGroup) > Number(groupSizeTarget)) {
+            throw new Error('qualifiersPerGroup cannot be greater than groupSizeTarget');
+        }
+        if (playoffSize !== null && Number(playoffSize) !== Number(qualifiersPerGroup)) {
+            throw new Error('playoffSize must equal qualifiersPerGroup when format=group+playoff');
+        }
+        out.playoffSize = Number(qualifiersPerGroup);
+    }
+
+    if (format === 'playoff') {
+        const effectivePlayoffSize = Number(playoffSize ?? qualifiersPerGroup ?? 0);
+        if (!SUPPORTED_PLAYOFF_SIZES.includes(effectivePlayoffSize)) {
+            throw new Error(`playoffSize must be one of ${SUPPORTED_PLAYOFF_SIZES.join(', ')} when format=playoff`);
+        }
+        out.playoffSize = effectivePlayoffSize;
+        if (!partial || Object.prototype.hasOwnProperty.call(source, 'groupStageMatchesPerPlayer')) {
+            out.groupStageMatchesPerPlayer = null;
+        }
+        if (!partial || Object.prototype.hasOwnProperty.call(source, 'groupsCount')) {
+            out.groupsCount = 1;
+        }
+    }
+
+    if (format === 'group' && playoffSize !== null && !SUPPORTED_PLAYOFF_SIZES.includes(Number(playoffSize))) {
+        throw new Error(`playoffSize must be one of ${SUPPORTED_PLAYOFF_SIZES.join(', ')}`);
     }
 
     return out;

@@ -3,7 +3,6 @@ import { createAuthContext } from './_auth.js';
 
 let j;
 
-
 async function main() {
     const auth = await createAuthContext('CONFIG');
     j = (method, path, body, expectedStatus = null) => auth.j(method, path, body, expectedStatus === null ? {} : { expectedStatus });
@@ -22,13 +21,17 @@ async function main() {
             estimatedMatchMinutes: 30,
             minRestPlayerMinutes: 15,
             courtsCount: 3,
-            avoidSameClubEarly: true
+            avoidSameClubEarly: true,
+            entryFeeEnabled: true,
+            entryFeeAmount: 4500
         }
     });
     assert.equal(t.config.matchRules.bestOf, 5);
     assert.equal(t.config.estimatedMatchMinutes, 30);
     assert.equal(t.config.courtsCount, 3);
     assert.equal(t.config.avoidSameClubEarly, true);
+    assert.equal(t.config.entryFeeEnabled, true);
+    assert.equal(t.config.entryFeeAmount, 4500);
 
     const invalidCategory = await j('POST', '/api/categories', {
         tournamentId: t._id,
@@ -38,7 +41,7 @@ async function main() {
         groupsCount: 1,
         qualifiersPerGroup: 3
     }, 400);
-    assert.match(invalidCategory.error, /qualifiersPerGroup must be 2 or 4/i);
+    assert.match(invalidCategory.error, /qualifiersPerGroup must be one of/i);
 
     const validCategory = await j('POST', '/api/categories', {
         tournamentId: t._id,
@@ -46,9 +49,22 @@ async function main() {
         format: 'group+playoff',
         groupSizeTarget: 8,
         groupsCount: 1,
-        qualifiersPerGroup: 4
+        qualifiersPerGroup: 8,
+        multiTiePolicy: 'direct_then_overall',
+        unresolvedTiePolicy: 'manual_override'
     });
-    assert.equal(validCategory.qualifiersPerGroup, 4);
+    assert.equal(validCategory.qualifiersPerGroup, 8);
+    assert.equal(validCategory.playoffSize, 8);
+
+    const playoffCategory = await j('POST', '/api/categories', {
+        tournamentId: t._id,
+        name: 'PLAYOFF-CAT',
+        format: 'playoff',
+        playoffSize: 8,
+        qualifiersPerGroup: 8
+    });
+    assert.equal(playoffCategory.format, 'playoff');
+    assert.equal(playoffCategory.playoffSize, 8);
 
     const configureName = `CONFIGURE-ROLLBACK-${Date.now()}`;
     const invalidConfigure = await j('POST', '/api/tournaments/configure', {
@@ -78,6 +94,7 @@ async function main() {
     console.log({
         tournamentId: t._id,
         validCategoryId: validCategory._id,
+        playoffCategoryId: playoffCategory._id,
         rollbackVerified: true
     });
 }

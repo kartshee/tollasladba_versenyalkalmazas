@@ -22,7 +22,8 @@
     "smoke:global": "node src/scripts/e2e_global_schedule.js",
     "smoke:auth": "node src/scripts/e2e_auth_ownership.js",
     "smoke:audit": "node src/scripts/e2e_audit_log.js",
-    "smoke:csv": "node src/scripts/e2e_csv_export.js"
+    "smoke:csv": "node src/scripts/e2e_csv_export.js",
+    "smoke:fee": "node src/scripts/e2e_entry_fee.js"
   },
   "keywords": [],
   "author": "",

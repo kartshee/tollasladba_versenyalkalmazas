@@ -5,15 +5,18 @@ export const AUDIT_SNAPSHOT_FIELDS = {
     category: [
         '_id', 'tournamentId', 'name', 'status', 'drawLockedAt', 'drawVersion', 'checkIn',
         'groupStageMatchesPerPlayer', 'groupSizeTarget', 'walkoverPolicy', 'incompletePolicy',
-        'gender', 'ageGroup', 'format', 'groupsCount', 'qualifiersPerGroup', 'createdAt', 'updatedAt'
+        'multiTiePolicy', 'unresolvedTiePolicy',
+        'gender', 'ageGroup', 'format', 'groupsCount', 'qualifiersPerGroup', 'playoffSize', 'createdAt', 'updatedAt'
     ],
     player: ['_id', 'tournamentId', 'categoryId', 'name', 'club', 'note', 'checkedInAt', 'mainEligibility', 'createdAt', 'updatedAt'],
     group: ['_id', 'tournamentId', 'categoryId', 'name', 'players', 'withdrawals'],
     match: [
         '_id', 'tournamentId', 'categoryId', 'groupId', 'player1', 'player2', 'pairKey', 'round', 'status',
         'roundNumber', 'drawVersion', 'resultType', 'voided', 'voidReason', 'voidedAt', 'courtNumber',
-        'startAt', 'endAt', 'actualStartAt', 'actualEndAt', 'resultUpdatedAt', 'sets', 'winner', 'createdAt', 'updatedAt'
-    ]
+        'startAt', 'endAt', 'actualStartAt', 'actualEndAt', 'resultUpdatedAt', 'umpireName', 'sets', 'winner', 'createdAt', 'updatedAt'
+    ],
+    entry: ['_id', 'tournamentId', 'categoryId', 'playerId', 'feeAmount', 'paid', 'billingName', 'billingAddress', 'paymentGroupId', 'createdAt', 'updatedAt'],
+    paymentGroup: ['_id', 'tournamentId', 'payerName', 'billingName', 'billingAddress', 'paid', 'note', 'createdAt', 'updatedAt']
 };
 
 function normalizeAuditData(value) {
