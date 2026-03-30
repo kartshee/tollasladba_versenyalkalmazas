@@ -8,7 +8,7 @@ import { generatePartialRoundRobin, recommendMatchesPerPlayer } from '../service
 import { assertTournamentOwned } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 import { ensureEntryForPlayer } from '../services/entry.service.js';
-import { buildSeededBracketPairs, findLatestGeneratedPlayoffRound, getInitialPlayoffRoundName, getNextPlayoffRoundName, getPlayoffRoundSize, isSupportedPlayoffSize, sortPlayoffRounds } from '../services/playoff.service.js';
+import { PLAYOFF_BRONZE_ROUND, buildSeededBracketPairs, findLatestGeneratedPlayoffRound, getInitialPlayoffRoundName, getNextPlayoffRoundName, getPlayoffRoundSize, isSupportedPlayoffSize, sortPlayoffRounds } from '../services/playoff.service.js';
 
 const router = Router();
 
@@ -89,6 +89,42 @@ function createPlayoffDocs({ category, groupId = null, players, drawVersion }) {
     }));
 }
 
+function buildBronzeMatchDoc({ category, groupId = null, semifinalMatches }) {
+    if (!Array.isArray(semifinalMatches) || semifinalMatches.length !== 2) return null;
+    const losers = semifinalMatches.map((match) => {
+        const p1 = String(match.player1);
+        const p2 = String(match.player2);
+        const winner = String(match.winner);
+        return winner === p1 ? match.player2 : match.player1;
+    });
+    if (losers.some((id) => !id)) return null;
+    return {
+        tournamentId: category.tournamentId,
+        categoryId: category._id,
+        groupId,
+        player1: losers[0],
+        player2: losers[1],
+        pairKey: makePairKey(losers[0], losers[1]),
+        round: PLAYOFF_BRONZE_ROUND,
+        status: 'pending',
+        roundNumber: 1,
+        drawVersion: Number(category.drawVersion ?? 1),
+        resultType: 'played',
+        voided: false,
+        voidReason: '',
+        voidedAt: null,
+        courtNumber: null,
+        startAt: null,
+        endAt: null,
+        actualStartAt: null,
+        actualEndAt: null,
+        resultUpdatedAt: null,
+        umpireName: '',
+        sets: [],
+        winner: null
+    };
+}
+
 function findAdvancableRound(matches) {
     const rounds = [...new Set(matches.map((m) => m.round))].sort(sortPlayoffRounds);
     const sizes = new Set(rounds.map((round) => getPlayoffRoundSize(round)).filter(Boolean));
@@ -108,7 +144,7 @@ async function advancePlayoffMatches({ category, groupId = null }) {
     else filter.groupId = null;
 
     const matches = await Match.find(filter).sort({ roundNumber: 1, createdAt: 1 }).lean();
-    const playoffMatches = matches.filter((m) => getPlayoffRoundSize(m.round));
+    const playoffMatches = matches.filter((m) => getPlayoffRoundSize(m.round) || m.round === PLAYOFF_BRONZE_ROUND);
     if (playoffMatches.length === 0) {
         throw new Error('No playoff matches generated yet');
     }
@@ -129,7 +165,7 @@ async function advancePlayoffMatches({ category, groupId = null }) {
         throw new Error(`Current playoff round is not finished (${adv.currentRound})`);
     }
 
-    const created = await Match.insertMany(currentMatches.reduce((acc, match, idx, arr) => {
+    const docs = currentMatches.reduce((acc, match, idx, arr) => {
         if (idx % 2 === 1) return acc;
         const other = arr[idx + 1];
         if (!other) return acc;
@@ -159,7 +195,14 @@ async function advancePlayoffMatches({ category, groupId = null }) {
             winner: null
         });
         return acc;
-    }, []));
+    }, []);
+
+    if (adv.currentRound === 'playoff_semi' && !playoffMatches.some((m) => m.round === PLAYOFF_BRONZE_ROUND)) {
+        const bronzeDoc = buildBronzeMatchDoc({ category, groupId, semifinalMatches: currentMatches });
+        if (bronzeDoc) docs.push(bronzeDoc);
+    }
+
+    const created = await Match.insertMany(docs);
 
     return created;
 }

@@ -6,6 +6,8 @@ import Category from '../models/Category.js';
 import Player from '../models/Player.js';
 import Group from '../models/Group.js';
 import Match from '../models/Match.js';
+import Entry from '../models/Entry.js';
+import PaymentGroup from '../models/PaymentGroup.js';
 
 function getArgValue(name, def = null) {
     const pfx = `${name}=`;
@@ -26,7 +28,12 @@ const DEFAULT_PREFIX_PATTERNS = [
     /^BAD-RULES-/i,
     /^CONFIG-VALID-/i,
     /^CONFIGURE-ROLLBACK-/i,
-    /^LIFE\s/i
+    /^LIFE\s/i,
+    /^FEE\s/i,
+    /^BOARD\s/i,
+    /^UMPIRE\s/i,
+    /^POONLY\s/i,
+    /^PSIZE\s/i
 ];
 
 function matchesSmokeName(name) {
@@ -67,15 +74,17 @@ async function main() {
         return;
     }
 
-    const [matchCount, groupCount, playerCount, categoryCount] = await Promise.all([
+    const [matchCount, groupCount, playerCount, categoryCount, entryCount, paymentGroupCount] = await Promise.all([
         Match.countDocuments({ tournamentId: { $in: tIds } }),
         Group.countDocuments({ tournamentId: { $in: tIds } }),
         Player.countDocuments({ tournamentId: { $in: tIds } }),
-        Category.countDocuments({ tournamentId: { $in: tIds } })
+        Category.countDocuments({ tournamentId: { $in: tIds } }),
+        Entry.countDocuments({ tournamentId: { $in: tIds } }),
+        PaymentGroup.countDocuments({ tournamentId: { $in: tIds } })
     ]);
 
     console.log('Will affect:');
-    console.log({ tournaments: tIds.length, categories: categoryCount, players: playerCount, groups: groupCount, matches: matchCount });
+    console.log({ tournaments: tIds.length, categories: categoryCount, players: playerCount, groups: groupCount, matches: matchCount, entries: entryCount, paymentGroups: paymentGroupCount });
 
     console.log('Sample tournaments:');
     for (const t of tournaments.slice(0, 10)) {
@@ -90,6 +99,8 @@ async function main() {
 
     const delMatches = await Match.deleteMany({ tournamentId: { $in: tIds } });
     const delGroups = await Group.deleteMany({ tournamentId: { $in: tIds } });
+    const delEntries = await Entry.deleteMany({ tournamentId: { $in: tIds } });
+    const delPaymentGroups = await PaymentGroup.deleteMany({ tournamentId: { $in: tIds } });
     const delPlayers = await Player.deleteMany({ tournamentId: { $in: tIds } });
     const delCategories = await Category.deleteMany({ tournamentId: { $in: tIds } });
     const delTournaments = await Tournament.deleteMany({ _id: { $in: tIds } });
@@ -98,6 +109,8 @@ async function main() {
     console.log({
         matches: delMatches.deletedCount,
         groups: delGroups.deletedCount,
+        entries: delEntries.deletedCount,
+        paymentGroups: delPaymentGroups.deletedCount,
         players: delPlayers.deletedCount,
         categories: delCategories.deletedCount,
         tournaments: delTournaments.deletedCount

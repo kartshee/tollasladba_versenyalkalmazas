@@ -8,7 +8,7 @@ import Category from '../models/Category.js';
 import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 import { computeStandings, findCutoffTieBlock } from '../services/standings.service.js';
-import { buildSeededBracketPairs, getInitialPlayoffRoundName, getNextPlayoffRoundName, getPlayoffRoundSize, isPlayoffRound, sortPlayoffRounds } from '../services/playoff.service.js';
+import { PLAYOFF_BRONZE_ROUND, buildSeededBracketPairs, getInitialPlayoffRoundName, getNextPlayoffRoundName, getPlayoffRoundSize, isPlayoffRound, sortPlayoffRounds } from '../services/playoff.service.js';
 
 const router = Router();
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
@@ -92,6 +92,36 @@ function createPlayoffDocsFromStandings({ group, category, qualified }) {
     }));
 }
 
+function buildBronzeMatchDoc({ group, category, semifinalMatches }) {
+    if (!Array.isArray(semifinalMatches) || semifinalMatches.length !== 2) return null;
+    const losers = semifinalMatches.map((match) => {
+        const p1 = String(match.player1);
+        const p2 = String(match.player2);
+        const winner = String(match.winner);
+        return winner === p1 ? match.player2 : match.player1;
+    });
+    if (losers.some((id) => !id)) return null;
+    return {
+        groupId: group._id,
+        tournamentId: group.tournamentId,
+        categoryId: group.categoryId,
+        player1: losers[0],
+        player2: losers[1],
+        pairKey: makePairKey(losers[0], losers[1]),
+        round: PLAYOFF_BRONZE_ROUND,
+        status: 'pending',
+        roundNumber: 1,
+        drawVersion: Number(category.drawVersion ?? 1),
+        resultType: 'played',
+        sets: [],
+        winner: null,
+        courtNumber: null,
+        startAt: null,
+        endAt: null,
+        umpireName: ''
+    };
+}
+
 function findAdvancableRound(matches) {
     const rounds = [...new Set(matches.map((m) => m.round).filter((round) => isPlayoffRound(round)))].sort(sortPlayoffRounds);
     const sizes = new Set(rounds.map((round) => getPlayoffRoundSize(round)).filter(Boolean));
@@ -143,6 +173,11 @@ async function advanceGroupPlayoff({ group, category }) {
         });
         return acc;
     }, []);
+
+    if (adv.currentRound === 'playoff_semi' && !playoffMatches.some((m) => m.round === PLAYOFF_BRONZE_ROUND)) {
+        const bronzeDoc = buildBronzeMatchDoc({ group, category, semifinalMatches: currentMatches });
+        if (bronzeDoc) docs.push(bronzeDoc);
+    }
 
     return Match.insertMany(docs);
 }
@@ -451,6 +486,7 @@ router.get('/:groupId/playoff', async (req, res) => {
         matches,
         rounds: grouped,
         semis: grouped.playoff_semi ?? [],
+        bronze: (grouped[PLAYOFF_BRONZE_ROUND] ?? [])[0] ?? null,
         final: (grouped.playoff_final ?? [])[0] ?? null
     });
 });
@@ -615,17 +651,20 @@ router.post('/:groupId/playoff/advance', async (req, res) => {
  * Visszafelé kompatibilis final generálás endpoint
  */
 router.post('/:groupId/playoff/final', async (req, res) => {
-    const groupId = req.params.groupId;
-    if (!isValidId(groupId)) return res.status(400).json({ error: 'Invalid groupId' });
+    if (!isValidId(req.params.groupId)) {
+        return res.status(400).json({ error: 'Invalid groupId' });
+    }
 
-    const { group } = await loadOwnedGroup(groupId, req.user._id);
+    const { group } = await loadOwnedGroup(req.params.groupId, req.user._id);
     if (!group) return res.status(404).json({ error: 'Group not found' });
+
     const category = await Category.findById(group.categoryId).select('drawVersion');
     if (!category) return res.status(404).json({ error: 'Category not found' });
 
     try {
         const created = await advanceGroupPlayoff({ group, category });
-        const populated = await Match.findById(created[0]._id)
+        const populated = await Match.find({ _id: { $in: created.map((m) => m._id) } })
+            .sort({ roundNumber: 1, createdAt: 1 })
             .populate('player1', 'name')
             .populate('player2', 'name')
             .populate('winner', 'name');
@@ -638,13 +677,13 @@ router.post('/:groupId/playoff/final', async (req, res) => {
             entityType: 'group',
             entityId: group._id,
             action: 'group.playoff_final_generated',
-            summary: `Playoff final generated for group ${group.name}`,
-            metadata: { finalId: String(created[0]._id) }
+            summary: `Legacy playoff final endpoint used for ${group.name}`,
+            metadata: { createdMatchIds: created.map((m) => String(m._id)) }
         });
 
-        res.status(201).json(populated);
+        return res.status(201).json({ created: populated.length, matches: populated });
     } catch (err) {
-        res.status(400).json({ error: err.message });
+        return res.status(400).json({ error: err.message });
     }
 });
 

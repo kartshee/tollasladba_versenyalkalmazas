@@ -143,15 +143,22 @@ async function runQualifiersFourScenario(tournamentId) {
     await setPlayed(semiTwo._id, [{ p1: 21, p2: 16 }, { p1: 21, p2: 16 }]);
 
     const finalCreated = await j('POST', `/api/groups/${group._id}/playoff/advance`);
-    assert.equal(finalCreated.matches[0].round, 'playoff_final');
-    const finalNames = [finalCreated.matches[0].player1.name, finalCreated.matches[0].player2.name].sort();
+    assert.equal(finalCreated.matches.length, 2);
+    const finalMatch = finalCreated.matches.find((m) => m.round === 'playoff_final');
+    const bronzeMatch = finalCreated.matches.find((m) => m.round === 'playoff_bronze');
+    assert(finalMatch?._id);
+    assert(bronzeMatch?._id);
+    const finalNames = [finalMatch.player1.name, finalMatch.player2.name].sort();
     assert.deepEqual(finalNames, ['A', 'B']);
+    const bronzeNames = [bronzeMatch.player1.name, bronzeMatch.player2.name].sort();
+    assert.deepEqual(bronzeNames, ['C', 'D']);
 
     return {
         groupId: group._id,
         qualified: created.qualified.map((x) => x.name),
         semiPairs,
-        finalNames
+        finalNames,
+        bronzeNames
     };
 }
 

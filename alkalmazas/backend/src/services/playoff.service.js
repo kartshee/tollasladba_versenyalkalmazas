@@ -1,4 +1,5 @@
 export const SUPPORTED_PLAYOFF_SIZES = [2, 4, 8, 16, 32];
+export const PLAYOFF_BRONZE_ROUND = 'playoff_bronze';
 
 const ROUND_BY_SIZE = new Map([
     [32, 'playoff_round_of_32'],
@@ -29,7 +30,7 @@ export function getNextPlayoffRoundName(round) {
 }
 
 export function isPlayoffRound(round) {
-    return SIZE_BY_ROUND.has(round);
+    return SIZE_BY_ROUND.has(round) || round === PLAYOFF_BRONZE_ROUND;
 }
 
 export function buildSeededBracketPairs(entries) {
@@ -51,6 +52,9 @@ export function buildSeededBracketPairs(entries) {
 }
 
 export function sortPlayoffRounds(roundA, roundB) {
+    if (roundA === PLAYOFF_BRONZE_ROUND && roundB === PLAYOFF_BRONZE_ROUND) return 0;
+    if (roundA === PLAYOFF_BRONZE_ROUND) return 1;
+    if (roundB === PLAYOFF_BRONZE_ROUND) return -1;
     return (getPlayoffRoundSize(roundB) ?? 0) - (getPlayoffRoundSize(roundA) ?? 0);
 }
 
