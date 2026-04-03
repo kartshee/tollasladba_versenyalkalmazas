@@ -8,6 +8,7 @@ import Group from '../models/Group.js';
 import Match from '../models/Match.js';
 import Entry from '../models/Entry.js';
 import PaymentGroup from '../models/PaymentGroup.js';
+import AuditLog from '../models/AuditLog.js';
 
 function getArgValue(name, def = null) {
     const pfx = `${name}=`;
@@ -33,7 +34,10 @@ const DEFAULT_PREFIX_PATTERNS = [
     /^BOARD\s/i,
     /^UMPIRE\s/i,
     /^POONLY\s/i,
-    /^PSIZE\s/i
+    /^PSIZE\s/i,
+    /^AUTH\s/i,
+    /^AUDIT\s/i,
+    /^CSV\s/i
 ];
 
 function matchesSmokeName(name) {
@@ -51,14 +55,19 @@ async function main() {
 
     await mongoose.connect(process.env.MONGO_URI);
 
-    let tournaments = await Tournament.find({}).select('_id name createdAt updatedAt').lean();
+    let tournaments = await Tournament.find({})
+        .select('_id name createdAt updatedAt')
+        .lean();
+
     tournaments = tournaments.filter((t) => matchesSmokeName(t.name));
 
     if (olderThanDays !== null) {
         if (!Number.isFinite(olderThanDays) || olderThanDays < 0) {
             throw new Error('--olderThanDays must be a non-negative number');
         }
+
         const cutoff = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
+
         tournaments = tournaments.filter((t) => {
             const stamp = t.createdAt ?? t.updatedAt;
             return stamp ? new Date(stamp) < cutoff : true;
@@ -67,28 +76,54 @@ async function main() {
 
     const tIds = tournaments.map((t) => t._id);
 
-    console.log(`Found ${tIds.length} smoke tournaments${olderThanDays !== null ? ` (olderThanDays=${olderThanDays})` : ''}.`);
+    console.log(
+        `Found ${tIds.length} smoke tournaments${
+            olderThanDays !== null ? ` (olderThanDays=${olderThanDays})` : ''
+        }.`
+    );
 
     if (tIds.length === 0) {
         await mongoose.disconnect();
         return;
     }
 
-    const [matchCount, groupCount, playerCount, categoryCount, entryCount, paymentGroupCount] = await Promise.all([
+    const [
+        matchCount,
+        groupCount,
+        playerCount,
+        categoryCount,
+        entryCount,
+        paymentGroupCount,
+        auditLogCount
+    ] = await Promise.all([
         Match.countDocuments({ tournamentId: { $in: tIds } }),
         Group.countDocuments({ tournamentId: { $in: tIds } }),
         Player.countDocuments({ tournamentId: { $in: tIds } }),
         Category.countDocuments({ tournamentId: { $in: tIds } }),
         Entry.countDocuments({ tournamentId: { $in: tIds } }),
-        PaymentGroup.countDocuments({ tournamentId: { $in: tIds } })
+        PaymentGroup.countDocuments({ tournamentId: { $in: tIds } }),
+        AuditLog.countDocuments({ tournamentId: { $in: tIds } })
     ]);
 
     console.log('Will affect:');
-    console.log({ tournaments: tIds.length, categories: categoryCount, players: playerCount, groups: groupCount, matches: matchCount, entries: entryCount, paymentGroups: paymentGroupCount });
+    console.log({
+        tournaments: tIds.length,
+        categories: categoryCount,
+        players: playerCount,
+        groups: groupCount,
+        matches: matchCount,
+        entries: entryCount,
+        paymentGroups: paymentGroupCount,
+        auditLogs: auditLogCount
+    });
 
     console.log('Sample tournaments:');
     for (const t of tournaments.slice(0, 10)) {
-        console.log(`- ${String(t._id)} | ${t.name}${t.createdAt ? ` | ${new Date(t.createdAt).toISOString()}` : ''}`);
+        console.log(
+            `- ${String(t._id)} | ${t.name}${
+                t.createdAt ? ` | ${new Date(t.createdAt).toISOString()}` : ''
+            }`
+        );
     }
 
     if (!apply) {
@@ -101,6 +136,7 @@ async function main() {
     const delGroups = await Group.deleteMany({ tournamentId: { $in: tIds } });
     const delEntries = await Entry.deleteMany({ tournamentId: { $in: tIds } });
     const delPaymentGroups = await PaymentGroup.deleteMany({ tournamentId: { $in: tIds } });
+    const delAuditLogs = await AuditLog.deleteMany({ tournamentId: { $in: tIds } });
     const delPlayers = await Player.deleteMany({ tournamentId: { $in: tIds } });
     const delCategories = await Category.deleteMany({ tournamentId: { $in: tIds } });
     const delTournaments = await Tournament.deleteMany({ _id: { $in: tIds } });
@@ -111,6 +147,7 @@ async function main() {
         groups: delGroups.deletedCount,
         entries: delEntries.deletedCount,
         paymentGroups: delPaymentGroups.deletedCount,
+        auditLogs: delAuditLogs.deletedCount,
         players: delPlayers.deletedCount,
         categories: delCategories.deletedCount,
         tournaments: delTournaments.deletedCount
