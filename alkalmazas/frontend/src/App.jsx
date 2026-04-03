@@ -1,24 +1,41 @@
-import { useEffect, useState } from "react";
+import { AuthProvider, useAuth } from './context/AuthContext.jsx';
+import { AuthLayout } from './layouts/AuthLayout.jsx';
+import { AppLayout } from './layouts/AppLayout.jsx';
+import { AppRouter, useRouter } from './router/router.jsx';
 
-function App() {
-    const [backendStatus, setBackendStatus] = useState("ellenőrzés...");
+function AppShell() {
+  const auth = useAuth();
+  const router = useRouter();
+  const route = AppRouter.match(router.pathname);
 
-    useEffect(() => {
-        fetch("http://localhost:5000/api/health")
-            .then((res) => res.json())
-            .then((data) => setBackendStatus(data.message))
-            .catch(() => setBackendStatus("Backend nem elérhető"));
-    }, []);
-
+  if (!route) {
     return (
-        <div style={{ padding: "2rem", fontFamily: "Arial, sans-serif" }}>
-            <h1>Tollaslabda versenyalkalmazás</h1>
-
-            <p>
-                <strong>Backend státusz:</strong> {backendStatus}
-            </p>
-        </div>
+      <AppLayout>
+        <AppRouter.NotFound />
+      </AppLayout>
     );
+  }
+
+  if (!auth.loading && route.access === 'private' && !auth.isAuthenticated) {
+    router.navigate('/login', { replace: true });
+    return null;
+  }
+
+  if (!auth.loading && route.access === 'guest' && auth.isAuthenticated) {
+    router.navigate('/', { replace: true });
+    return null;
+  }
+
+  const page = <route.component params={route.params} />;
+  return route.layout === 'auth' ? <AuthLayout>{page}</AuthLayout> : <AppLayout>{page}</AppLayout>;
 }
 
-export default App;
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRouter.Provider>
+        <AppShell />
+      </AppRouter.Provider>
+    </AuthProvider>
+  );
+}
