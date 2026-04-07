@@ -41,43 +41,71 @@ export function CategoriesPage({ params }) {
         action={<AppLink className="button button--primary" to={`/tournaments/${id}/categories/new`}>Új kategória</AppLink>}
       />
       {error ? <div className="alert alert--error">{error}</div> : null}
-      <SectionCard title="Kategórialisták">
-        {loading ? <div className="muted">Betöltés...</div> : null}
-        {!loading && categories.length === 0 ? <div className="muted">Még nincs kategória.</div> : null}
-        {!loading && categories.length > 0 ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Név</th>
-                <th>Formátum</th>
-                <th>Csoportok</th>
-                <th>Továbbjutók</th>
-                <th>Playoff méret</th>
-                <th>Állapot</th>
-                <th>Műveletek</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((category) => (
-                <tr key={category._id}>
-                  <td>{category.name}</td>
-                  <td>{category.format}</td>
-                  <td>{category.groupsCount}</td>
-                  <td>{category.qualifiersPerGroup}</td>
-                  <td>{category.playoffSize ?? '-'}</td>
-                  <td><StatusBadge>{category.status}</StatusBadge></td>
-                  <td>
-                    <div className="inline-actions">
-                      <AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${category._id}`}>Megnyitás</AppLink>
-                      <AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${category._id}/edit`}>Szerkesztés</AppLink>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : null}
-      </SectionCard>
+
+      <div className="page-grid">
+        <div className="page-grid__main stack-lg">
+          <SectionCard title="Kategórialisták" subtitle="A versenyhez tartozó összes kategória egy helyen.">
+            {loading ? <div className="muted">Betöltés...</div> : null}
+            {!loading && categories.length === 0 ? <div className="muted">Még nincs kategória.</div> : null}
+            {!loading && categories.length > 0 ? (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Név</th>
+                    <th>Formátum</th>
+                    <th>Csoportok</th>
+                    <th>Továbbjutók</th>
+                    <th>Playoff méret</th>
+                    <th>Állapot</th>
+                    <th>Műveletek</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categories.map((category) => (
+                    <tr key={category._id}>
+                      <td>{category.name}</td>
+                      <td>{category.format}</td>
+                      <td>{category.groupsCount}</td>
+                      <td>{category.qualifiersPerGroup}</td>
+                      <td>{category.playoffSize ?? '-'}</td>
+                      <td><StatusBadge>{category.status}</StatusBadge></td>
+                      <td>
+                        <div className="inline-actions">
+                          <AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${category._id}`}>Megnyitás</AppLink>
+                          <AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${category._id}/edit`}>Szerkesztés</AppLink>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : null}
+          </SectionCard>
+        </div>
+
+        <aside className="page-grid__side aside-stack">
+          <SectionCard title="Mit kezelsz itt?">
+            <ul className="bullet-list">
+              <li>A kategória formátumát: group, group+playoff vagy playoff.</li>
+              <li>A továbbjutók számát és a playoff méretét.</li>
+              <li>A tie-break policy és egyéb lebonyolítási szabályokat.</li>
+            </ul>
+          </SectionCard>
+
+          <SectionCard title="Gyors összesítő">
+            <div className="key-value-list">
+              <div className="key-value-list__row">
+                <span className="key-value-list__label">Kategóriák száma</span>
+                <span className="key-value-list__value">{categories.length}</span>
+              </div>
+              <div className="key-value-list__row">
+                <span className="key-value-list__label">Playoff kategóriák</span>
+                <span className="key-value-list__value">{categories.filter((c) => c.format !== 'group').length}</span>
+              </div>
+            </div>
+          </SectionCard>
+        </aside>
+      </div>
     </div>
   );
 }

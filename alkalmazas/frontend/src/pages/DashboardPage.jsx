@@ -46,7 +46,7 @@ export function DashboardPage() {
       <PageHeader
         eyebrow="Dashboard"
         title="Saját versenyek"
-        description="A versenyek áttekintése, gyors navigáció és új verseny létrehozása egy helyen."
+        description="A főoldalról gyorsan áttekinthető, melyik verseny milyen állapotban van, és innen érhető el minden fontos adminisztrációs folyamat."
         action={<AppLink className="button button--primary" to="/tournaments/new">Új verseny</AppLink>}
       />
 
@@ -59,34 +59,76 @@ export function DashboardPage() {
 
       {error ? <div className="alert alert--error">{error}</div> : null}
 
-      <SectionCard title="Versenyek" subtitle="A saját versenyeid időrendben, a legfrissebbek elöl.">
-        {loading ? <div className="muted">Betöltés...</div> : null}
-        {!loading && tournaments.length === 0 ? (
-          <EmptyState
-            title="Még nincs versenyed"
-            description="Hozz létre egy új versenyt, majd állítsd be a globális paramétereket, kategóriákat és nevezéseket."
-            action={<AppLink className="button button--primary" to="/tournaments/new">Első verseny létrehozása</AppLink>}
-          />
-        ) : null}
+      <div className="page-grid">
+        <div className="page-grid__main stack-lg">
+          <SectionCard title="Versenyek" subtitle="A legfontosabb munkafelület. Innen nyitható meg minden meglévő verseny.">
+            {loading ? <div className="muted">Betöltés...</div> : null}
+            {!loading && tournaments.length === 0 ? (
+              <EmptyState
+                title="Még nincs versenyed"
+                description="Hozz létre egy új versenyt, majd állítsd be a globális paramétereket, kategóriákat és nevezéseket."
+                action={<AppLink className="button button--primary" to="/tournaments/new">Első verseny létrehozása</AppLink>}
+              />
+            ) : null}
 
-        {!loading && tournaments.length > 0 ? (
-          <div className="card-grid">
-            {tournaments.map((tournament) => (
-              <AppLink key={tournament._id} to={`/tournaments/${tournament._id}`} className="tournament-card">
-                <div className="tournament-card__top">
-                  <h3>{tournament.name}</h3>
-                  <StatusBadge tone={statusTone[tournament.status] ?? 'neutral'}>{statusLabel[tournament.status] ?? tournament.status}</StatusBadge>
-                </div>
-                <p>{tournament.location || 'Helyszín még nincs megadva.'}</p>
-                <div className="tournament-card__meta">
-                  <span>{tournament.date ? new Date(tournament.date).toLocaleDateString('hu-HU') : 'Dátum nincs megadva'}</span>
-                  <span>{tournament.config?.courtsCount ?? 1} pálya</span>
-                </div>
+            {!loading && tournaments.length > 0 ? (
+              <div className="card-grid">
+                {tournaments.map((tournament) => (
+                  <AppLink key={tournament._id} to={`/tournaments/${tournament._id}`} className="tournament-card">
+                    <div className="tournament-card__top">
+                      <h3>{tournament.name}</h3>
+                      <StatusBadge tone={statusTone[tournament.status] ?? 'neutral'}>
+                        {statusLabel[tournament.status] ?? tournament.status}
+                      </StatusBadge>
+                    </div>
+                    <p>{tournament.location || 'Helyszín még nincs megadva.'}</p>
+                    <div className="tournament-card__meta">
+                      <span>{tournament.date ? new Date(tournament.date).toLocaleDateString('hu-HU') : 'Dátum nincs megadva'}</span>
+                      <span>{tournament.config?.courtsCount ?? 1} pálya</span>
+                    </div>
+                  </AppLink>
+                ))}
+              </div>
+            ) : null}
+          </SectionCard>
+        </div>
+
+        <aside className="page-grid__side aside-stack">
+          <SectionCard title="Gyors műveletek" subtitle="A leggyakoribb admin feladatok egy helyen.">
+            <div className="stack-md">
+              <AppLink className="quick-link" to="/tournaments/new">
+                <strong>Új verseny létrehozása</strong>
+                <span>Verseny alapadatok, pályák, nevezési díj és játékvezetők beállítása.</span>
               </AppLink>
-            ))}
-          </div>
-        ) : null}
-      </SectionCard>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Állapot összesítő" subtitle="Gyors helyzetkép a jelenlegi versenyállományról.">
+            <div className="key-value-list">
+              <div className="key-value-list__row">
+                <span className="key-value-list__label">Aktív versenyek</span>
+                <span className="key-value-list__value">{grouped.running.length}</span>
+              </div>
+              <div className="key-value-list__row">
+                <span className="key-value-list__label">Tervezetek</span>
+                <span className="key-value-list__value">{grouped.draft.length}</span>
+              </div>
+              <div className="key-value-list__row">
+                <span className="key-value-list__label">Lezárt versenyek</span>
+                <span className="key-value-list__value">{grouped.finished.length}</span>
+              </div>
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Használati elv" subtitle="A dashboard célja a gyors eligazodás, nem a túlterhelt grafikai megjelenítés.">
+            <ul className="bullet-list">
+              <li>Minden fontos funkció 1-2 kattintásból elérhető legyen.</li>
+              <li>A legfontosabb versenynapi műveletek külön oldalon jelenjenek meg.</li>
+              <li>A veszélyes műveletek mindig elkülönüljenek a normál admin funkcióktól.</li>
+            </ul>
+          </SectionCard>
+        </aside>
+      </div>
     </div>
   );
 }
