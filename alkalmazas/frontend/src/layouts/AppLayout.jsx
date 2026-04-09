@@ -2,9 +2,13 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useRouter } from '../router/router.jsx';
 import { AppLink } from '../components/AppLink.jsx';
 
-function NavLink({ to, label, icon }) {
+function NavLink({ to, label, icon, exact = false }) {
   const { pathname } = useRouter();
-  const active = pathname === to || (to !== '/' && pathname.startsWith(to));
+  const normalizedTo = to.endsWith('/') && to !== '/' ? to.slice(0, -1) : to;
+  const normalizedPath = pathname.endsWith('/') && pathname !== '/' ? pathname.slice(0, -1) : pathname;
+  const active = exact
+    ? normalizedPath === normalizedTo
+    : normalizedPath === normalizedTo || (normalizedTo !== '/' && normalizedPath.startsWith(`${normalizedTo}/`));
   return (
     <AppLink className={`sidebar-link${active ? ' sidebar-link--active' : ''}`} to={to}>
       {icon ? <span className="sidebar-link__icon">{icon}</span> : null}
@@ -66,7 +70,7 @@ export function AppLayout({ children }) {
               <div className="sidebar__section">
                 <div className="sidebar__section-title">Aktuális verseny</div>
                 <nav className="sidebar__nav">
-                  <NavLink to={`/tournaments/${ctx.tournamentId}`} label="Áttekintés" icon="◈" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}`} label="Áttekintés" icon="◈" exact />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/categories`} label="Kategóriák" icon="⊟" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/entries`} label="Nevezések" icon="☰" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/checkin`} label="Check-in" icon="✓" />
@@ -87,6 +91,7 @@ export function AppLayout({ children }) {
                         to={`/tournaments/${ctx.tournamentId}/categories/${ctx.categoryId}`}
                         label="Műveletek"
                         icon="◇"
+                        exact
                       />
                       <NavLink
                         to={`/tournaments/${ctx.tournamentId}/categories/${ctx.categoryId}/standings`}

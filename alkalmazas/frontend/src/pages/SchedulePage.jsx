@@ -3,6 +3,7 @@ import { BackLink, PageHeader } from '../components/PageHeader.jsx';
 import { FormField } from '../components/FormField.jsx';
 import { SectionCard } from '../components/SectionCard.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
+import { AppLink } from '../components/AppLink.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
 import { formatDateTime, roundLabel, toneForStatus, formatStatusLabel } from '../services/formatters.js';

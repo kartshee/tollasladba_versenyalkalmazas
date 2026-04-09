@@ -37,7 +37,7 @@ export function EntriesPage({ params }) {
       api.get(`/api/tournaments/${id}`, { token: auth.token }),
       api.get(`/api/entries?tournamentId=${id}`, { token: auth.token }),
       api.get(`/api/categories?tournamentId=${id}`, { token: auth.token }),
-      api.get(`/api/payments?tournamentId=${id}`, { token: auth.token }),
+      api.get(`/api/payment-groups?tournamentId=${id}`, { token: auth.token }),
     ]);
 
     setTournament(tournamentData);
@@ -167,7 +167,7 @@ export function EntriesPage({ params }) {
         .map((item) => item.trim())
         .filter(Boolean);
 
-      await api.post('/api/payments', {
+      await api.post('/api/payment-groups', {
         tournamentId: id,
         payerName: paymentForm.payerName,
         billingName: paymentForm.billingName,

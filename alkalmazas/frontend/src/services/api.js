@@ -7,7 +7,25 @@ function joinUrl(path) {
 
 async function parseResponse(response) {
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  const contentType = response.headers.get('content-type') ?? '';
+
+  let data = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      if (contentType.includes('application/json')) {
+        const error = new Error('A szerver JSON választ ígért, de a válasz nem volt feldolgozható.');
+        error.status = response.status;
+        error.data = text;
+        throw error;
+      }
+      const error = new Error('A szerver nem JSON választ adott. Valószínűleg hibás frontend útvonal vagy backend végpont került meghívásra.');
+      error.status = response.status;
+      error.data = text;
+      throw error;
+    }
+  }
 
   if (!response.ok) {
     const message = data?.error || data?.message || 'Ismeretlen hiba történt.';
