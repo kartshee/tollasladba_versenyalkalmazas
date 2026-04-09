@@ -5,10 +5,8 @@ export function InfoHint({ title = 'Magyarázat', text }) {
   const ref = useRef(null);
 
   useEffect(() => {
-    function handleClick(event) {
-      if (ref.current && !ref.current.contains(event.target)) {
-        setOpen(false);
-      }
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -16,11 +14,17 @@ export function InfoHint({ title = 'Magyarázat', text }) {
 
   return (
     <span className="info-hint" ref={ref}>
-      <button type="button" className="info-hint__button" onClick={() => setOpen((value) => !value)} aria-label={title}>
+      <button
+        type="button"
+        className="info-hint__button"
+        onClick={() => setOpen((v) => !v)}
+        aria-label={title}
+        aria-expanded={open}
+      >
         i
       </button>
       {open ? (
-        <span className="info-hint__panel" role="dialog" aria-label={title}>
+        <span className="info-hint__panel" role="tooltip" aria-label={title}>
           <strong>{title}</strong>
           <span>{text}</span>
         </span>

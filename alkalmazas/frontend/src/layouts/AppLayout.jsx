@@ -2,11 +2,12 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useRouter } from '../router/router.jsx';
 import { AppLink } from '../components/AppLink.jsx';
 
-function MainNavLink({ to, label }) {
+function NavLink({ to, label, icon }) {
   const { pathname } = useRouter();
   const active = pathname === to || (to !== '/' && pathname.startsWith(to));
   return (
-    <AppLink className={`sidebar-link ${active ? 'sidebar-link--active' : ''}`} to={to}>
+    <AppLink className={`sidebar-link${active ? ' sidebar-link--active' : ''}`} to={to}>
+      {icon ? <span className="sidebar-link__icon">{icon}</span> : null}
       {label}
     </AppLink>
   );
@@ -14,69 +15,111 @@ function MainNavLink({ to, label }) {
 
 function getContext(pathname) {
   const parts = pathname.split('/').filter(Boolean);
-  const tournamentsIndex = parts.indexOf('tournaments');
-  if (tournamentsIndex === -1 || !parts[tournamentsIndex + 1]) return null;
-  const tournamentId = parts[tournamentsIndex + 1];
-  return {
-    tournamentId,
-    categoryId: parts.includes('categories') && parts[parts.indexOf('categories') + 1] && parts[parts.indexOf('categories') + 1] !== 'new'
-      ? parts[parts.indexOf('categories') + 1]
-      : null,
-  };
+  const ti = parts.indexOf('tournaments');
+  if (ti === -1 || !parts[ti + 1]) return null;
+  const tournamentId = parts[ti + 1];
+  const ci = parts.indexOf('categories');
+  const categoryId =
+    ci !== -1 && parts[ci + 1] && parts[ci + 1] !== 'new' ? parts[ci + 1] : null;
+  return { tournamentId, categoryId };
+}
+
+function UserInitials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(' ');
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 export function AppLayout({ children }) {
   const auth = useAuth();
   const { pathname } = useRouter();
-  const context = getContext(pathname);
+  const ctx = getContext(pathname);
+  const name = auth.user?.name ?? '';
 
   return (
     <div className="app-shell">
       <aside className="sidebar">
+        {/* Brand */}
         <div className="sidebar__brand">
           <div className="brand-mark brand-mark--small">TB</div>
           <div>
-            <div className="sidebar__title">Tollas admin</div>
-            <div className="sidebar__subtitle">Egyszerű, gyors versenykezelés</div>
+            <div className="sidebar__title">Tollas Admin</div>
+            <div className="sidebar__subtitle">Versenykezelő rendszer</div>
           </div>
         </div>
 
-        <div className="sidebar__section">
-          <div className="sidebar__section-title">Általános</div>
-          <nav className="sidebar__nav">
-            <MainNavLink to="/" label="Főoldal" />
-            <MainNavLink to="/tournaments/new" label="Új verseny" />
-          </nav>
-        </div>
-
-        {context ? (
+        <div className="sidebar__body">
+          {/* Főmenü */}
           <div className="sidebar__section">
-            <div className="sidebar__section-title">Aktuális verseny</div>
+            <div className="sidebar__section-title">Főmenü</div>
             <nav className="sidebar__nav">
-              <MainNavLink to={`/tournaments/${context.tournamentId}`} label="Áttekintés" />
-              <MainNavLink to={`/tournaments/${context.tournamentId}/categories`} label="Kategóriák" />
-              <MainNavLink to={`/tournaments/${context.tournamentId}/entries`} label="Nevezések" />
-              <MainNavLink to={`/tournaments/${context.tournamentId}/checkin`} label="Check-in" />
-              <MainNavLink to={`/tournaments/${context.tournamentId}/matches`} label="Meccsek" />
-              <MainNavLink to={`/tournaments/${context.tournamentId}/schedule`} label="Ütemezés" />
-              <MainNavLink to={`/tournaments/${context.tournamentId}/board`} label="Board" />
-              {context.categoryId ? (
-                <>
-                  <MainNavLink to={`/tournaments/${context.tournamentId}/categories/${context.categoryId}`} label="Kategória műveletek" />
-                  <MainNavLink to={`/tournaments/${context.tournamentId}/categories/${context.categoryId}/standings`} label="Standings" />
-                  <MainNavLink to={`/tournaments/${context.tournamentId}/categories/${context.categoryId}/playoff`} label="Playoff" />
-                </>
-              ) : null}
+              <NavLink to="/" label="Dashboard" icon="⊞" />
+              <NavLink to="/tournaments/new" label="Új verseny" icon="+" />
             </nav>
           </div>
-        ) : null}
 
+          {/* Aktuális verseny */}
+          {ctx ? (
+            <>
+              <div className="sidebar__divider" />
+              <div className="sidebar__section">
+                <div className="sidebar__section-title">Aktuális verseny</div>
+                <nav className="sidebar__nav">
+                  <NavLink to={`/tournaments/${ctx.tournamentId}`} label="Áttekintés" icon="◈" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}/categories`} label="Kategóriák" icon="⊟" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}/entries`} label="Nevezések" icon="☰" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}/checkin`} label="Check-in" icon="✓" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}/matches`} label="Meccsek" icon="⚡" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}/schedule`} label="Ütemezés" icon="◷" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}/board`} label="Board" icon="▣" />
+                </nav>
+              </div>
+
+              {/* Kategória szint */}
+              {ctx.categoryId ? (
+                <>
+                  <div className="sidebar__divider" />
+                  <div className="sidebar__section">
+                    <div className="sidebar__section-title">Kategória</div>
+                    <nav className="sidebar__nav">
+                      <NavLink
+                        to={`/tournaments/${ctx.tournamentId}/categories/${ctx.categoryId}`}
+                        label="Műveletek"
+                        icon="◇"
+                      />
+                      <NavLink
+                        to={`/tournaments/${ctx.tournamentId}/categories/${ctx.categoryId}/standings`}
+                        label="Standings"
+                        icon="≡"
+                      />
+                      <NavLink
+                        to={`/tournaments/${ctx.tournamentId}/categories/${ctx.categoryId}/playoff`}
+                        label="Playoff"
+                        icon="⊳"
+                      />
+                    </nav>
+                  </div>
+                </>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+
+        {/* Footer / User */}
         <div className="sidebar__footer">
           <div className="sidebar__user-card">
-            <div className="sidebar__user-name">{auth.user?.name ?? 'Bejelentkezett felhasználó'}</div>
-            <div className="sidebar__user-email">{auth.user?.email ?? 'admin'}</div>
+            <div className="sidebar__user-avatar">{UserInitials(name)}</div>
+            <div style={{ minWidth: 0 }}>
+              <div className="sidebar__user-name">{name || 'Felhasználó'}</div>
+              <div className="sidebar__user-email">{auth.user?.email ?? ''}</div>
+            </div>
           </div>
-          <button className="button button--danger-soft button--block" type="button" onClick={auth.logout}>
+          <button
+            className="button button--danger-soft button--block button--sm"
+            type="button"
+            onClick={auth.logout}
+          >
             Kijelentkezés
           </button>
         </div>
@@ -84,12 +127,18 @@ export function AppLayout({ children }) {
 
       <div className="app-shell__content">
         <header className="topbar">
-          <div>
-            <div className="topbar__title">Tollaslabda versenykezelő rendszer</div>
-            <div className="topbar__subtitle">Intuitív admin felület döntnököknek és versenyszervezőknek</div>
+          <div className="topbar__left">
+            <span className="topbar__title">Tollaslabda Versenykezelő Rendszer</span>
+            {ctx ? (
+              <>
+                <span className="topbar__sep">/</span>
+                <span className="topbar__badge">Verseny aktív</span>
+              </>
+            ) : null}
           </div>
-          <div className="topbar__meta">Navy blue admin UI</div>
+          <span className="topbar__meta">Admin felület</span>
         </header>
+
         <main className="page-content">
           <div className="content-wrap">{children}</div>
         </main>

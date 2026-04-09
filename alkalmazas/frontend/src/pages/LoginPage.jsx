@@ -27,30 +27,54 @@ export function LoginPage() {
   }
 
   return (
-    <div>
+    <div className="stack-lg">
       <div className="auth-heading">
         <h1>Bejelentkezés</h1>
         <p>Lépj be a versenykezelő admin felületre.</p>
       </div>
 
-      <form className="stack-lg" onSubmit={handleSubmit}>
+      <form className="stack-md" onSubmit={handleSubmit}>
         <FormField label="E-mail" htmlFor="login-email">
-          <input id="login-email" value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="nev@example.com" required />
+          <input
+            id="login-email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            placeholder="nev@example.com"
+            required
+            autoComplete="email"
+          />
         </FormField>
 
         <FormField label="Jelszó" htmlFor="login-password">
-          <input id="login-password" value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Legalább 6 karakter" required />
+          <input
+            id="login-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            type="password"
+            placeholder="Jelszó"
+            required
+            autoComplete="current-password"
+          />
         </FormField>
 
         {error ? <div className="alert alert--error">{error}</div> : null}
 
-        <button className="button button--primary button--block" type="submit" disabled={submitting}>
+        <button
+          className="button button--primary button--block"
+          type="submit"
+          disabled={submitting}
+          style={{ marginTop: '0.25rem' }}
+        >
           {submitting ? 'Beléptetés...' : 'Belépés'}
         </button>
       </form>
 
-      <p className="auth-footer-text">
-        Még nincs fiókod? <AppLink to="/register">Regisztráció</AppLink>
+      <p className="auth-footer-text" style={{ textAlign: 'center' }}>
+        Még nincs fiókod?{' '}
+        <AppLink to="/register" className="text-link">
+          Regisztráció
+        </AppLink>
       </p>
     </div>
   );

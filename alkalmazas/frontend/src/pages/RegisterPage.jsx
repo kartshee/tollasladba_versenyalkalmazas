@@ -11,6 +11,10 @@ export function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  function setField(field) {
+    return (e) => setForm((s) => ({ ...s, [field]: e.target.value }));
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
@@ -30,38 +34,79 @@ export function RegisterPage() {
   }
 
   return (
-    <div>
+    <div className="stack-lg">
       <div className="auth-heading">
         <h1>Regisztráció</h1>
         <p>Hozz létre admin fiókot a saját versenyeid kezeléséhez.</p>
       </div>
 
-      <form className="stack-lg" onSubmit={handleSubmit}>
+      <form className="stack-md" onSubmit={handleSubmit}>
         <FormField label="Név" htmlFor="register-name">
-          <input id="register-name" value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} placeholder="Példa Elek" required />
+          <input
+            id="register-name"
+            value={form.name}
+            onChange={setField('name')}
+            placeholder="Példa Elek"
+            required
+            autoComplete="name"
+          />
         </FormField>
 
         <FormField label="E-mail" htmlFor="register-email">
-          <input id="register-email" value={form.email} onChange={(e) => setForm((s) => ({ ...s, email: e.target.value }))} type="email" placeholder="nev@example.com" required />
+          <input
+            id="register-email"
+            value={form.email}
+            onChange={setField('email')}
+            type="email"
+            placeholder="nev@example.com"
+            required
+            autoComplete="email"
+          />
         </FormField>
 
-        <FormField label="Jelszó" htmlFor="register-password">
-          <input id="register-password" value={form.password} onChange={(e) => setForm((s) => ({ ...s, password: e.target.value }))} type="password" placeholder="Legalább 6 karakter" required />
-        </FormField>
+        <div className="form-grid form-grid--two">
+          <FormField label="Jelszó" htmlFor="register-password">
+            <input
+              id="register-password"
+              value={form.password}
+              onChange={setField('password')}
+              type="password"
+              placeholder="Legalább 6 karakter"
+              required
+              autoComplete="new-password"
+            />
+          </FormField>
 
-        <FormField label="Jelszó megerősítése" htmlFor="register-password-confirm">
-          <input id="register-password-confirm" value={form.confirmPassword} onChange={(e) => setForm((s) => ({ ...s, confirmPassword: e.target.value }))} type="password" required />
-        </FormField>
+          <FormField label="Jelszó megerősítése" htmlFor="register-password-confirm">
+            <input
+              id="register-password-confirm"
+              value={form.confirmPassword}
+              onChange={setField('confirmPassword')}
+              type="password"
+              placeholder="Ismételd meg"
+              required
+              autoComplete="new-password"
+            />
+          </FormField>
+        </div>
 
         {error ? <div className="alert alert--error">{error}</div> : null}
 
-        <button className="button button--primary button--block" type="submit" disabled={submitting}>
-          {submitting ? 'Regisztráció...' : 'Regisztráció'}
+        <button
+          className="button button--primary button--block"
+          type="submit"
+          disabled={submitting}
+          style={{ marginTop: '0.25rem' }}
+        >
+          {submitting ? 'Regisztráció...' : 'Fiók létrehozása'}
         </button>
       </form>
 
-      <p className="auth-footer-text">
-        Már van fiókod? <AppLink to="/login">Belépés</AppLink>
+      <p className="auth-footer-text" style={{ textAlign: 'center' }}>
+        Már van fiókod?{' '}
+        <AppLink to="/login" className="text-link">
+          Belépés
+        </AppLink>
       </p>
     </div>
   );

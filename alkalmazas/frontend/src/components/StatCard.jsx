@@ -1,8 +1,8 @@
-export function StatCard({ label, value }) {
+export function StatCard({ label, value, accent }) {
   return (
-    <article className="stat-card">
+    <article className="stat-card" style={accent ? { '--stat-accent': accent } : {}}>
       <div className="stat-card__label">{label}</div>
-      <div className="stat-card__value">{value}</div>
+      <div className="stat-card__value">{value ?? '—'}</div>
     </article>
   );
 }

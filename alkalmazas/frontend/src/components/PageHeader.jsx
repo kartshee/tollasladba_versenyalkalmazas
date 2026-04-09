@@ -14,5 +14,9 @@ export function PageHeader({ eyebrow, title, description, action }) {
 }
 
 export function BackLink({ to, children = '← Vissza' }) {
-  return <AppLink className="back-link" to={to}>{children}</AppLink>;
+  return (
+    <AppLink className="back-link" to={to}>
+      {children}
+    </AppLink>
+  );
 }
