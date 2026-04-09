@@ -1,34 +1,40 @@
 # Összefoglaló a tollaslabda versenykezelő rendszer backendjéről
 
-A rendszer jelenlegi állapotában a backend már működőképes, és az alapvető üzleti logikák automatizált tesztekkel is ellenőrizve lettek. A korábbi versenykezelési funkciók mellett bekerült célzott műveleti naplózás, többféle CSV export, konfigurálható tie-break logika, nevezési díj nyilvántartás, valamint a későbbi kijelzős nézet backend alapja is.
+A rendszer jelenlegi állapotában a backend már működőképes, és az alapvető üzleti logikák automatizált tesztekkel is ellenőrizve lettek. A korábbi versenykezelési funkciók mellett bekerült célzott műveleti naplózás, többféle CSV export, konfigurálható tie-break logika, nevezési díj nyilvántartás, nyilvános board végpont, valamint fejlesztői segédszkriptek a demo adatok feltöltéséhez és az adatbázis tisztításához.
 
 ## Mit tud jelenleg a backend
 
 A backend jelenleg az alábbi fő funkciókat támogatja:
 
 - felhasználói regisztráció és bejelentkezés
-- versenyek létrehozása és mentése a létrehozó felhasználó profiljához
+- tulajdonoshoz kötött versenykezelés
+- versenyek létrehozása, szerkesztése és listázása
+- versenyszintű globális konfiguráció kezelése
 - kategóriák létrehozása és konfigurálása
 - játékosok egyenkénti vagy tömeges felvétele
+- nevezések és nevezési díjak adminisztratív nyilvántartása
+- csoportos befizetések kezelése
 - check-in kezelés, vagyis annak jelölése, hogy ki jelent meg ténylegesen
+- draw finalizálás
 - csoportkörös meccsek generálása
 - teljes és csonka round robin logika
 - meccsek pályákra és időpontokra ütemezése
 - több kategória egyidejű, fair pályaelosztásos globális ütemezése
 - eredmények rögzítése és szükség esetén javítása
+- speciális meccskimenetelek kezelése
 - visszalépések kezelése
 - csoportállás számítása konfigurálható tie-break szabályokkal
 - továbbjutók kiválasztása
 - playoff ág generálása kategórián belül
 - külön playoff-only, tehát eleve egyenes kieséses kategória kezelése
-- bronzmeccs generálása a playoffban
+- bronzmeccs automatikus generálása a playoffban
 - konfigurálható meccsszabályok kezelése
 - hibás konfigurációk kiszűrése
-- nevezési díj adminisztratív nyilvántartása
 - döntnök / versenyszervező és meccsszintű játékvezető logika elkülönítése
 - fontos műveletek naplózása műveleti napló formájában
 - adatok exportálása CSV formátumban
 - nyilvános board végpont a futó és következő meccsek megjelenítéséhez
+- fejlesztői cleanup és demo seed szkriptek
 
 A rendszerhez automatizált smoke tesztek is készültek, amelyek a fő folyamatokat végigellenőrzik.
 
@@ -41,9 +47,49 @@ A bejelentkezés után minden verseny a létrehozó felhasználóhoz kapcsolódi
 - minden versenynek van tulajdonosa
 - a felhasználó csak a saját versenyeit látja
 - csak a saját versenyeit tudja módosítani
-- a hozzá tartozó kategóriák, csoportok, meccsek és ütemezések is az adott tulajdonosi körhöz tartoznak
+- a hozzá tartozó kategóriák, csoportok, meccsek, nevezések és ütemezések is az adott tulajdonosi körhöz tartoznak
 
-Ez azért fontos, mert így a rendszer már nem egy „közös tesztbackend”, hanem valódi felhasználói alkalmazásként működik.
+Ez azért fontos, mert így a rendszer már nem egy közös tesztbackend, hanem valódi, felhasználóhoz kötött alkalmazásként működik.
+
+## Versenyszintű alapadatok és globális erőforrások
+
+A verseny nem csak névből és dátumból áll, hanem saját globális beállításokkal is rendelkezik. Ilyenek például:
+
+- pályák száma
+- becsült meccsidő
+- minimális játékospihenő
+- minimális bírói pihenő
+- pályaforgatási idő
+- alapértelmezett check-in grace idő
+- nevezési díj engedélyezése és összege
+- meccsszabályok
+- döntnök / játékvezetői névlista
+
+Ez azért fontos, mert vannak olyan erőforrások és paraméterek, amelyek nem egy kategóriához, hanem a teljes versenyhez tartoznak.
+
+## Kategóriák és állapotkezelés
+
+A rendszerben a versenyek több kategóriát tartalmazhatnak. Egy kategória saját állapottal és saját lebonyolítási logikával rendelkezik.
+
+A backend kezeli például az alábbi kategóriaállapotokat:
+
+- `setup`
+- `checkin_open`
+- `draw_locked`
+- `in_progress`
+- `completed`
+
+Emellett nyilvántartja többek között:
+- a draw verzióját
+- a draw lezárásának időpontját
+- a check-in lezárás paramétereit
+- a csoportkörös meccsszám-célt
+- a tie-break policykat
+- a formátumot
+- a továbbjutók számát
+- a playoff méretét
+
+Ez lehetővé teszi, hogy a kategóriák ne csak statikus adatként, hanem valódi folyamatként legyenek kezelhetők.
 
 ## Csoportkör és round robin logika
 
@@ -79,20 +125,13 @@ A rendszer célja nem az, hogy egy nagyobb amatőr mezőnyben teljes pontosságg
 - meg lehessen határozni a top 4, top 5 vagy top 6 játékost
 - legyen egy fair alap a playoffhoz vagy a következő fordulóhoz
 
-Tehát itt a hangsúly nem a teljes mezőny tökéletes sorrendjén, hanem a **továbbjutók megbízható kiválasztásán** van.
-
-Egy iskolai, amatőr vagy házi verseny esetén sokszor fontosabb, hogy a lebonyolítás időben lemenjen, mint az, hogy mindenki mindenkivel játsszon. Ebben a környezetben a csonka round robin megfelelő kompromisszum, mert már néhány meccsből is láthatóvá válik:
-
-- ki nyer stabilan
-- ki teljesít a mezőny elején
-- ki alkalmas továbbjutásra
-- hogyan alakul a győzelmi arány, a szettkülönbség és a pontkülönbség
+Tehát itt a hangsúly nem a teljes mezőny tökéletes sorrendjén, hanem a továbbjutók megbízható kiválasztásán van.
 
 ### Miben különbözik a svájci rendszertől
 
-Fontos, hogy a csonka round robin **nem azonos a svájci rendszerrel**.
+Fontos, hogy a csonka round robin nem azonos a svájci rendszerrel.
 
-A svájci rendszerben a következő fordulók párosításai mindig az addigi eredmények alapján készülnek. Ezzel szemben ebben a rendszerben a párosítások **előre generálódnak**, tehát nem az egyes fordulók eredményeihez igazodva készülnek újra.
+A svájci rendszerben a következő fordulók párosításai mindig az addigi eredmények alapján készülnek. Ezzel szemben ebben a rendszerben a párosítások előre generálódnak, tehát nem az egyes fordulók eredményeihez igazodva készülnek újra.
 
 Ezért a jelenlegi megoldás nem Swiss rendszer, hanem egy előre kialakított, részleges round robin.
 
@@ -119,7 +158,7 @@ Ez azért fontos, mert a csonka round robin így nem önmagában áll, hanem egy
 
 A rendszer nem csak nevezettekkel dolgozik, hanem kezeli azt is, hogy ténylegesen ki jelent meg.
 
-A check-in folyamat során külön jelölhető, hogy egy játékos valóban jelen van-e. Az ütemezés és a draw lezárása már ezek alapján történik. Ennek előnye, hogy a rendszer nem próbál olyan játékosokkal számolni, akik ugyan neveztek, de a versenyen végül nem jelennek meg.
+A check-in folyamat során külön jelölhető, hogy egy játékos valóban jelen van-e. A draw lezárása, a csoportok felépítése és az ütemezés már ezek alapján történik. Ennek előnye, hogy a rendszer nem próbál olyan játékosokkal számolni, akik ugyan neveztek, de a versenyen végül nem jelennek meg.
 
 Ez valós versenyhelyzetben fontos, mert gyakran előfordulnak:
 
@@ -127,17 +166,20 @@ Ez valós versenyhelyzetben fontos, mert gyakran előfordulnak:
 - távolmaradások
 - visszalépések
 
+A rendszer a kategóriaszintű check-in paramétereket is kezeli, tehát a lezárási idő és az esetleges grace override is nyilvántartható.
+
 ## Ütemezés és pályabeosztás
 
 A backend kétféle ütemezési logikát kezel.
 
-### 1. Csoportszintű ütemezés
+### 1. Csoport- vagy meccshalmaz-szintű ütemezés
 
 A rendszer képes egy adott csoport vagy meccshalmaz meccseit pályákra és idősávokra elosztani úgy, hogy figyelembe veszi:
 
 - a rendelkezésre álló pályákat
 - a meccsek becsült hosszát
 - a játékosok minimális pihenőidejét
+- a játékvezetők minimális pihenőidejét
 - a pályaforgatási időt
 
 ### 2. Globális, több kategóriás fair ütemezés
@@ -146,7 +188,7 @@ A rendszer már képes több kategória meccseit együtt nézni, és a pályáka
 
 Ez különösen fontos, mert egy valós versenyen gyakran egyszerre több kategória fut, miközben a pályák száma korlátozott.
 
-A globális scheduler jelenlegi első verziója:
+A globális scheduler jelenlegi verziója:
 
 - az összes ütemezhető meccset együtt nézi
 - nem engedi, hogy egy kategória tartósan lefoglalja az összes pályát
@@ -160,22 +202,25 @@ Ez még nem matematikailag optimális ütemező, hanem egy egyszerű, kiszámít
 
 A rendszer képes normál, szettes eredmények rögzítésére, és kezeli a speciális kimeneteleket is, például:
 
-- walkover
-- feladás
-- egyéb speciális lezárási helyzetek
+- `played`
+- `wo`
+- `ff`
+- `ret`
+
+A meccsek külön `resultType` mezővel, státusszal és időbélyegekkel rendelkeznek, tehát jól nyomon követhető, hogy mi történt velük.
 
 Fontos szempont volt, hogy az eredmények szükség esetén utólag javíthatók legyenek, mivel egy versenyen előfordulhat, hogy valaki rosszul mondja be az eredményt, vagy adminisztrációs hiba történik.
 
 A rendszer ezt kontrolláltan engedi:
 
 - a normál befejezett meccs javítható
-- az érvénytelenített vagy policy alapján kezelt meccsek nem írhatók át tetszőlegesen
+- a voidolt vagy policy alapján kezelt meccsek nem írhatók át tetszőlegesen
 
 ## Csoportállás és tie-break logika
 
 A rendszer automatikusan számolja a csoportállást a meccseredmények alapján.
 
-A tie-break logika már konfigurálható, így kategóriánként beállítható, hogyan kezelje a többfős holtversenyeket.
+A tie-break logika konfigurálható, így kategóriánként beállítható, hogyan kezelje a többfős holtversenyeket.
 
 A jelenlegi logika támogatja például azt, hogy:
 
@@ -217,6 +262,11 @@ Beállítható például:
 - mekkora pontkülönbség kelljen a győzelemhez
 - hol legyen a pontplafon
 
+A támogatott `bestOf` értékek jelenleg:
+- 1
+- 3
+- 5
+
 Ez azért hasznos, mert különböző korosztályokban, versenyformátumokban vagy gyorsított lebonyolításnál eltérő szabályok lehetnek életszerűek.
 
 A rendszer ezeket nem csak eltárolja, hanem ténylegesen ezek alapján validálja az eredményeket.
@@ -235,7 +285,7 @@ Például ellenőrzi:
 
 A konfigurációs létrehozási folyamat tranzakciós alapon működik, így ha egy összetettebb create/configure művelet során hiba történik, a rendszer rollbacket végez, és nem hagy maga után félkész állapotot.
 
-## Nevezési díj nyilvántartása
+## Nevezési díj és nevezések nyilvántartása
 
 A backend már támogatja a nevezési díj adminisztratív nyilvántartását is.
 
@@ -249,7 +299,10 @@ Ez nem online fizetési rendszer, tehát nem banki tranzakciókat kezel, hanem a
 - mi a számlázási cím
 - történt-e csoportos befizetés
 
-A rendszer azt az esetet is kezeli, amikor például egy egyesület egy összegben fizeti be több játékos nevezését.
+A rendszer ezt két külön entitással kezeli:
+
+- `Entry` – egy adott játékos adott kategóriás nevezése
+- `PaymentGroup` – több nevezés közös fizetési adminisztrációja
 
 Ez a funkció kifejezetten adminisztratív célú, nem tényleges pénzkezelési modul.
 
@@ -257,7 +310,9 @@ Ez a funkció kifejezetten adminisztratív célú, nem tényleges pénzkezelési
 
 A rendszer technikai oldalán továbbra is admin felhasználó van, de a versenylogikában ez a szerep döntnökként vagy versenyszervezőként értelmezhető.
 
-Emellett a mérkőzésekhez külön játékvezető is hozzárendelhető. Ez azt jelenti, hogy a rendszer már kezeli:
+Versenyszinten megadhatók a globális bírói / hivatalos személyi nevek, meccsszinten pedig külön `umpireName` mezővel kezelhető a játékvezető.
+
+Ez azt jelenti, hogy a rendszer már kezeli:
 
 - a verseny adminisztrátori / döntnöki működtetését
 - a meccsszintű játékvezető hozzárendelést
@@ -267,6 +322,15 @@ Adogatásbírót és vonalbírót a rendszer jelenleg nem kezel külön, mert am
 ## Műveleti naplózás
 
 A rendszer kiegészült célzott műveleti naplózással is. Ez nem teljes körű, minden lekérést rögzítő auditmechanizmus, hanem egy olyan karcsú eseménynapló, amely a fontos versenyállapot-változásokat tárolja.
+
+A naplózott események kapcsolhatók többek között:
+
+- felhasználóhoz
+- versenyhez
+- kategóriához
+- csoporthoz
+- meccshez
+- játékoshoz
 
 A naplózás célja elsősorban nem a többadminos elszámoltathatóság, hanem az, hogy egy verseny közben vagy utólag visszakövethető legyen, milyen lényeges műveletek történtek a rendszerben.
 
@@ -282,8 +346,6 @@ A naplózott események közé tartozhat például:
 - visszalépés kezelése
 - playoff generálása
 
-A rendszer tehát nemcsak végrehajtja a fontos műveleteket, hanem azok történetét is visszakövethetővé teszi.
-
 ## CSV export
 
 A backend több fontos adatállomány exportját is támogatja CSV formátumban. Ez azért hasznos, mert az adatok könnyen megnyithatók táblázatkezelőben, archiválhatók, továbbküldhetők, vagy más adminisztratív feldolgozásra is használhatók.
@@ -294,13 +356,11 @@ Jelenleg támogatott például:
 - játékos- és check-in lista export
 - csoportállás export
 
-A meccslista export tartalmazhatja többek között a kategóriát, a csoportot, a játékosokat, a státuszt, a pályát, az időpontot és az eredményt. A játékoslista export alkalmas a jelenléti és check-in információk áttekintésére. A standings export pedig a csoporton belüli sorrendet és a számolt mutatókat is ki tudja adni.
-
-Ez a funkció elsősorban gyakorlati adminisztratív célokat szolgál, nem új lebonyolítási logikát vezet be, hanem a rendszer használhatóságát növeli.
+A meccslista export tartalmazhatja többek között a kategóriát, a csoportot, a játékosokat, a státuszt, a pályát, az időpontot, a játékvezetőt és az eredményt. A játékoslista export alkalmas a jelenléti és check-in információk áttekintésére. A standings export pedig a csoporton belüli sorrendet, a tie-break információkat és a számolt mutatókat is ki tudja adni.
 
 ## Kijelzős / TV-s nézet backend alapja
 
-A backend már tartalmaz egy olyan végpontot is, amely egy későbbi kijelzős vagy TV-s nézetet tud kiszolgálni.
+A backend már tartalmaz egy olyan nyilvános végpontot is, amely egy későbbi kijelzős vagy TV-s nézetet tud kiszolgálni.
 
 Ez lehetővé teszi, hogy egy külön felületen megjelenjenek:
 
@@ -308,6 +368,21 @@ Ez lehetővé teszi, hogy egy külön felületen megjelenjenek:
 - a következőként tervezett mérkőzések
 
 Ez a funkció elsősorban azt a gyakorlati problémát kezeli, hogy a játékosok folyamatosan érdeklődnek, mikor és hol játszanak.
+
+## Fejlesztői és tesztelési segédeszközök
+
+A backendhez több fejlesztői segédszkript is tartozik.
+
+### Cleanup szkriptek
+A rendszer támogatja:
+- smoke adatok törlését
+- nem-user adatok törlését
+- teljes adatbázis takarítását is
+
+Ez hasznos akkor, ha a sok automatizált teszt után az adatbázist újra tiszta állapotba kell hozni.
+
+### Demo seed
+Készült külön demo seed script is, amely egy meglévő felhasználóhoz tud összefüggő demo adatot létrehozni. Ez frontend fejlesztéshez és bemutatáshoz hasznos, mert nem szétszórt smoke adatokat, hanem egy koherens tesztversenyt állít elő.
 
 ## Tesztelés
 
@@ -344,18 +419,21 @@ Rendelkezik:
 
 - felhasználói azonosítással
 - tulajdonolt versenyekkel
+- versenyszintű konfigurációval
 - csoportkörös és csonka round robin logikával
 - fair globális pályaelosztással
 - eredmény- és standings kezeléssel
 - konfigurálható tie-break logikával
 - továbbjutás- és playoff logikával
 - bronzmeccs kezeléssel
+- playoff-only kategóriával
 - konfigurálható meccsszabályokkal
-- nevezési díj nyilvántartással
+- nevezési díj és nevezésnyilvántartással
 - döntnök / játékvezető logikával
 - célzott műveleti naplózással
 - CSV exporttal
 - board backend alappal
+- cleanup és demo seed szkriptekkel
 - automatizált tesztekkel
 
 ## Amiben kérném a véleményt
