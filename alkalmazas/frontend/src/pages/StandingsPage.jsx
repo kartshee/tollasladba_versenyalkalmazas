@@ -5,7 +5,7 @@ import { SectionCard } from '../components/SectionCard.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
-import { formatStatusLabel, toneForStatus } from '../services/formatters.js';
+import { formatStatusLabel, toneForStatus } from '../services/formatters.jsx';
 
 export function StandingsPage({ params }) {
   const { id, categoryId } = params;

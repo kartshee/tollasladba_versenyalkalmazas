@@ -73,10 +73,12 @@ export function AppLayout({ children }) {
                   <NavLink to={`/tournaments/${ctx.tournamentId}`} label="Áttekintés" icon="◈" exact />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/categories`} label="Kategóriák" icon="⊟" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/entries`} label="Nevezések" icon="☰" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}/payments`} label="Befizetések" icon="$" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/checkin`} label="Check-in" icon="✓" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/matches`} label="Meccsek" icon="⚡" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/schedule`} label="Ütemezés" icon="◷" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/board`} label="Board" icon="▣" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}/admin`} label="Export / Napló" icon="↓" />
                 </nav>
               </div>
 
@@ -113,13 +115,16 @@ export function AppLayout({ children }) {
 
         {/* Footer / User */}
         <div className="sidebar__footer">
+          <AppLink className="sidebar__profile-link" to="/profile">
           <div className="sidebar__user-card">
             <div className="sidebar__user-avatar">{UserInitials(name)}</div>
             <div style={{ minWidth: 0 }}>
               <div className="sidebar__user-name">{name || 'Felhasználó'}</div>
               <div className="sidebar__user-email">{auth.user?.email ?? ''}</div>
+              <div className="sidebar__user-hint">Profil szerkesztése →</div>
             </div>
           </div>
+          </AppLink>
           <button
             className="button button--danger-soft button--block button--sm"
             type="button"

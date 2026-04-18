@@ -6,7 +6,7 @@ import { SectionCard } from '../components/SectionCard.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
-import { formatDateTime, formatStatusLabel, toneForStatus, roundLabel, setsToText, outcomeLabel, byName } from '../services/formatters.js';
+import { formatDateTime, formatStatusLabel, toneForStatus, roundLabel, setsToText, outcomeLabel, byName } from '../services/formatters.jsx';
 
 const emptyResultRows = [
   { p1: '', p2: '' },

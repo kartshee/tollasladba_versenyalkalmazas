@@ -103,6 +103,14 @@ export function TournamentOverviewPage({ params }) {
                 <strong>Board</strong>
                 <span>Futó és következő meccsek kijelzős nézete.</span>
               </AppLink>
+              <AppLink className="quick-link" to={`/tournaments/${id}/payments`}>
+                <strong>Befizetések</strong>
+                <span>Fizetési csoportok és nevezési díj adminisztrációja.</span>
+              </AppLink>
+              <AppLink className="quick-link" to={`/tournaments/${id}/admin`}>
+                <strong>Export / Napló</strong>
+                <span>CSV letöltések és műveleti napló megtekintése.</span>
+              </AppLink>
             </div>
           </SectionCard>
 

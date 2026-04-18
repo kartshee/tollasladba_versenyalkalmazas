@@ -6,7 +6,7 @@ import { StatusBadge } from '../components/StatusBadge.jsx';
 import { AppLink } from '../components/AppLink.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
-import { formatDateTime, roundLabel, toneForStatus, formatStatusLabel } from '../services/formatters.js';
+import { formatDateTime, roundLabel, toneForStatus, formatStatusLabel } from '../services/formatters.jsx';
 
 function defaultScheduleForm(tournament) {
   const config = tournament?.config ?? {};

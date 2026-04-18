@@ -1316,3 +1316,161 @@ textarea { resize: vertical; }
   .auth-layout__inner { grid-template-columns: 1fr; }
   .auth-layout__brand { display: none; }
 }
+
+/* ─────────────────────────────────────────────
+   BOARD PAGE
+───────────────────────────────────────────── */
+.board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+.board-card {
+  border-radius: 12px;
+  padding: 1rem 1.125rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.board-card--running {
+  background: var(--success-soft);
+  border: 1.5px solid var(--success-border);
+}
+
+.board-card--upcoming {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+}
+
+.board-card__court {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.board-card__players {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.board-card__player {
+  font-weight: 700;
+  font-size: 0.975rem;
+  color: var(--text);
+}
+
+.board-card__vs {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.board-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
+}
+
+.board-card__category {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  flex: 1;
+}
+
+.board-card__time {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.topbar-meta-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ─────────────────────────────────────────────
+   ADMIN / EXPORT PAGE
+───────────────────────────────────────────── */
+.export-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.export-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.125rem;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-alt);
+}
+
+.export-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.export-card__info strong {
+  font-size: 0.95rem;
+}
+
+.warning-text {
+  color: var(--warning);
+  font-size: 0.78rem;
+}
+
+/* ─────────────────────────────────────────────
+   SIDEBAR PROFILE LINK
+───────────────────────────────────────────── */
+.sidebar__profile-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.sidebar__profile-link:hover .sidebar__user-card {
+  background: var(--sidebar-hover);
+}
+
+.sidebar__user-hint {
+  font-size: 0.68rem;
+  color: var(--sidebar-text);
+  margin-top: 0.1rem;
+}
+
+/* ─────────────────────────────────────────────
+   FORM SECTION LABEL (PaymentsPage)
+───────────────────────────────────────────── */
+.form-section-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 0.35rem 0;
+}
+
+/* ─────────────────────────────────────────────
+   ALERT SUCCESS
+───────────────────────────────────────────── */
+.alert--success {
+  background: var(--success-soft);
+  border: 1px solid var(--success-border);
+  color: var(--success);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}

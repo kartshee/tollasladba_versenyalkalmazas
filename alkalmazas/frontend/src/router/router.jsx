@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { AdminPage } from '../pages/AdminPage.jsx';
 import { BoardPage } from '../pages/BoardPage.jsx';
 import { CategoriesPage } from '../pages/CategoriesPage.jsx';
 import { CategoryDetailPage } from '../pages/CategoryDetailPage.jsx';
@@ -9,7 +10,9 @@ import { EntriesPage } from '../pages/EntriesPage.jsx';
 import { LoginPage } from '../pages/LoginPage.jsx';
 import { MatchesPage } from '../pages/MatchesPage.jsx';
 import { NotFoundPage } from '../pages/NotFoundPage.jsx';
+import { PaymentsPage } from '../pages/PaymentsPage.jsx';
 import { PlayoffPage } from '../pages/PlayoffPage.jsx';
+import { ProfilePage } from '../pages/ProfilePage.jsx';
 import { RegisterPage } from '../pages/RegisterPage.jsx';
 import { SchedulePage } from '../pages/SchedulePage.jsx';
 import { StandingsPage } from '../pages/StandingsPage.jsx';
@@ -22,6 +25,7 @@ const routes = [
   { path: '/login', component: LoginPage, layout: 'auth', access: 'guest' },
   { path: '/register', component: RegisterPage, layout: 'auth', access: 'guest' },
   { path: '/', component: DashboardPage, layout: 'app', access: 'private' },
+  { path: '/profile', component: ProfilePage, layout: 'app', access: 'private' },
   { path: '/tournaments/new', component: TournamentCreatePage, layout: 'app', access: 'private' },
   { path: '/tournaments/:id', component: TournamentOverviewPage, layout: 'app', access: 'private' },
   { path: '/tournaments/:id/categories', component: CategoriesPage, layout: 'app', access: 'private' },
@@ -31,10 +35,12 @@ const routes = [
   { path: '/tournaments/:id/categories/:categoryId/standings', component: StandingsPage, layout: 'app', access: 'private' },
   { path: '/tournaments/:id/categories/:categoryId/playoff', component: PlayoffPage, layout: 'app', access: 'private' },
   { path: '/tournaments/:id/entries', component: EntriesPage, layout: 'app', access: 'private' },
+  { path: '/tournaments/:id/payments', component: PaymentsPage, layout: 'app', access: 'private' },
   { path: '/tournaments/:id/checkin', component: CheckinPage, layout: 'app', access: 'private' },
   { path: '/tournaments/:id/matches', component: MatchesPage, layout: 'app', access: 'private' },
   { path: '/tournaments/:id/schedule', component: SchedulePage, layout: 'app', access: 'private' },
   { path: '/tournaments/:id/board', component: BoardPage, layout: 'app', access: 'private' },
+  { path: '/tournaments/:id/admin', component: AdminPage, layout: 'app', access: 'private' },
 ];
 
 function normalizePath(pathname) {

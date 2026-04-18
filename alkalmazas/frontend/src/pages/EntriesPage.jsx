@@ -6,7 +6,7 @@ import { StatusBadge } from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
 import { AppLink } from '../components/AppLink.jsx';
-import { formatCurrency, formatStatusLabel, toneForStatus, normalizeSearch } from '../services/formatters.js';
+import { formatCurrency, formatStatusLabel, toneForStatus, normalizeSearch } from '../services/formatters.jsx';
 
 const emptyEntryForm = {
   feeAmount: '',
