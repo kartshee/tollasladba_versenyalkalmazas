@@ -2,7 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import PaymentGroup from '../models/PaymentGroup.js';
 import Entry from '../models/Entry.js';
-import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
+import { assertTournamentOwned, getOwnedTournamentIds, isValidObjectId } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
 const router = Router();
@@ -25,6 +25,7 @@ async function syncPaymentGroupEntries(group, entryIds = []) {
 }
 
 async function loadOwnedPaymentGroup(groupId, userId) {
+    if (!isValidObjectId(groupId)) return { group: null, tournament: null };
     const group = await PaymentGroup.findById(groupId);
     if (!group) return { group: null, tournament: null };
     const tournament = await assertTournamentOwned(group.tournamentId, userId);

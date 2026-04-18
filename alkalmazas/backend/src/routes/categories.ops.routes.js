@@ -5,7 +5,7 @@ import Player from '../models/Player.js';
 import Group from '../models/Group.js';
 import Match from '../models/Match.js';
 import { generatePartialRoundRobin, recommendMatchesPerPlayer } from '../services/roundRobin.service.js';
-import { assertTournamentOwned } from '../services/ownership.service.js';
+import { assertTournamentOwned, isValidObjectId } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 import { ensureEntryForPlayer } from '../services/entry.service.js';
 import { PLAYOFF_BRONZE_ROUND, buildSeededBracketPairs, findLatestGeneratedPlayoffRound, getInitialPlayoffRoundName, getNextPlayoffRoundName, getPlayoffRoundSize, isSupportedPlayoffSize, sortPlayoffRounds } from '../services/playoff.service.js';
@@ -28,6 +28,7 @@ function shuffle(arr) {
 }
 
 async function loadOwnedCategory(categoryId, userId) {
+    if (!isValidObjectId(categoryId)) return { category: null, tournament: null };
     const category = await Category.findById(categoryId);
     if (!category) return { category: null, tournament: null };
     const tournament = await assertTournamentOwned(category.tournamentId, userId);

@@ -4,13 +4,14 @@ import Entry from '../models/Entry.js';
 import Player from '../models/Player.js';
 import Category from '../models/Category.js';
 import PaymentGroup from '../models/PaymentGroup.js';
-import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
+import { assertTournamentOwned, getOwnedTournamentIds, isValidObjectId } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
 const router = Router();
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 async function loadOwnedEntry(entryId, userId) {
+    if (!isValidObjectId(entryId)) return { entry: null, tournament: null };
     const entry = await Entry.findById(entryId);
     if (!entry) return { entry: null, tournament: null };
     const tournament = await assertTournamentOwned(entry.tournamentId, userId);

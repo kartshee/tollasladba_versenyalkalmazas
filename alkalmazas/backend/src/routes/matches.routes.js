@@ -7,12 +7,13 @@ import Tournament from '../models/Tournament.js';
 import { generatePartialRoundRobin, recommendMatchesPerPlayer } from '../services/roundRobin.service.js';
 import { determineMatchWinner, normalizeMatchRules, validateMatchResult } from '../services/badmintonRules.service.js';
 import { buildGlobalSchedule, buildSchedule } from '../services/scheduler.service.js';
-import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
+import { assertTournamentOwned, getOwnedTournamentIds, isValidObjectId } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
 const router = Router();
 
 async function loadOwnedGroup(groupId, userId) {
+    if (!isValidObjectId(groupId)) return { group: null, tournament: null };
     const group = await Group.findById(groupId);
     if (!group) return { group: null, tournament: null };
     const tournament = await assertTournamentOwned(group.tournamentId, userId);
@@ -21,6 +22,7 @@ async function loadOwnedGroup(groupId, userId) {
 }
 
 async function loadOwnedMatch(matchId, userId) {
+    if (!isValidObjectId(matchId)) return { match: null, tournament: null };
     const match = await Match.findById(matchId);
     if (!match) return { match: null, tournament: null };
     const tournament = await assertTournamentOwned(match.tournamentId, userId);
@@ -29,6 +31,9 @@ async function loadOwnedMatch(matchId, userId) {
 }
 
 async function loadOwnedTournamentMatchRules(tournamentId, userId) {
+    if (!isValidObjectId(tournamentId)) {
+        return { tournament: null, rules: normalizeMatchRules() };
+    }
     const tournament = await Tournament.findOne({ _id: tournamentId, ownerId: userId }).select('config.matchRules').lean();
     if (!tournament) {
         return { tournament: null, rules: normalizeMatchRules() };

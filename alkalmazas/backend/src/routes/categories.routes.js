@@ -5,12 +5,13 @@ import Player from '../models/Player.js';
 import Group from '../models/Group.js';
 import Match from '../models/Match.js';
 import { normalizeCategoryPayload } from '../services/configValidation.service.js';
-import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
+import { assertTournamentOwned, getOwnedTournamentIds, isValidObjectId } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
 const router = Router();
 
 async function loadOwnedCategory(categoryId, userId) {
+    if (!isValidObjectId(categoryId)) return { category: null, tournament: null };
     const c = await Category.findById(categoryId);
     if (!c) return { category: null, tournament: null };
     const t = await assertTournamentOwned(c.tournamentId, userId);
@@ -55,6 +56,9 @@ router.post('/', async (req, res) => {
 router.get('/', async (req, res) => {
     const filter = {};
     if (req.query.tournamentId) {
+        if (!isValidObjectId(req.query.tournamentId)) {
+            return res.status(400).json({ error: 'Invalid tournamentId' });
+        }
         const t = await assertTournamentOwned(req.query.tournamentId, req.user._id, { lean: true });
         if (!t) return res.json([]);
         filter.tournamentId = req.query.tournamentId;

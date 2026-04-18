@@ -5,7 +5,7 @@ import Category from '../models/Category.js';
 import Group from '../models/Group.js';
 import Match from '../models/Match.js';
 import Player from '../models/Player.js';
-import { assertTournamentOwned } from '../services/ownership.service.js';
+import { assertTournamentOwned, isValidObjectId } from '../services/ownership.service.js';
 import { sendCsv, formatIso, formatSets, sanitizeFilePart } from '../services/csv.service.js';
 import { computeStandings } from '../services/standings.service.js';
 
@@ -13,6 +13,7 @@ const router = Router();
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 async function loadOwnedGroup(groupId, userId, { populatePlayers = false } = {}) {
+    if (!isValidObjectId(groupId)) return { group: null, tournament: null };
     let query = Group.findById(groupId);
     if (populatePlayers) query = query.populate('players');
     const group = await query;

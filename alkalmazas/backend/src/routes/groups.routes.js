@@ -5,7 +5,7 @@ import Match from '../models/Match.js';
 import Player from '../models/Player.js';
 import Tournament from '../models/Tournament.js';
 import Category from '../models/Category.js';
-import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
+import { assertTournamentOwned, getOwnedTournamentIds, isValidObjectId } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 import { computeStandings, findCutoffTieBlock } from '../services/standings.service.js';
 import { PLAYOFF_BRONZE_ROUND, buildSeededBracketPairs, getInitialPlayoffRoundName, getNextPlayoffRoundName, getPlayoffRoundSize, isPlayoffRound, sortPlayoffRounds } from '../services/playoff.service.js';
@@ -21,6 +21,7 @@ const makePairKey = (a, b) => {
 
 
 async function loadOwnedGroup(groupId, userId, { populatePlayers = false } = {}) {
+    if (!isValidObjectId(groupId)) return { group: null, tournament: null };
     let query = Group.findById(groupId);
     if (populatePlayers) query = query.populate('players');
     const group = await query;

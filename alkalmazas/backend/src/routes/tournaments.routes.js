@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import Tournament from '../models/Tournament.js';
+import { assertTournamentOwned } from '../services/ownership.service.js';
 import { normalizeTournamentPayload } from '../services/configValidation.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
@@ -32,13 +33,13 @@ router.get('/', async (req, res) => {
 });
 
 router.get('/:id', async (req, res) => {
-    const t = await Tournament.findOne({ _id: req.params.id, ownerId: req.user._id });
+    const t = await assertTournamentOwned(req.params.id, req.user._id);
     if (!t) return res.status(404).json({ error: 'Tournament not found' });
     res.json(t);
 });
 
 router.patch('/:id', async (req, res) => {
-    const t = await Tournament.findOne({ _id: req.params.id, ownerId: req.user._id });
+    const t = await assertTournamentOwned(req.params.id, req.user._id);
     if (!t) return res.status(404).json({ error: 'Tournament not found' });
 
     if (t.status !== 'draft') {
@@ -69,7 +70,7 @@ router.patch('/:id', async (req, res) => {
 });
 
 router.post('/:id/start', async (req, res) => {
-    const t = await Tournament.findOne({ _id: req.params.id, ownerId: req.user._id });
+    const t = await assertTournamentOwned(req.params.id, req.user._id);
     if (!t) return res.status(404).json({ error: 'Tournament not found' });
 
     if (t.status !== 'draft') {
@@ -95,7 +96,7 @@ router.post('/:id/start', async (req, res) => {
 });
 
 router.post('/:id/finish', async (req, res) => {
-    const t = await Tournament.findOne({ _id: req.params.id, ownerId: req.user._id });
+    const t = await assertTournamentOwned(req.params.id, req.user._id);
     if (!t) return res.status(404).json({ error: 'Tournament not found' });
 
     if (t.status !== 'running') {

@@ -17,14 +17,23 @@ function NavLink({ to, label, icon, exact = false }) {
   );
 }
 
+function isObjectIdLike(value) {
+  return /^[0-9a-fA-F]{24}$/.test(String(value ?? ''));
+}
+
 function getContext(pathname) {
   const parts = pathname.split('/').filter(Boolean);
   const ti = parts.indexOf('tournaments');
   if (ti === -1 || !parts[ti + 1]) return null;
+
   const tournamentId = parts[ti + 1];
+  if (!isObjectIdLike(tournamentId)) return null;
+
   const ci = parts.indexOf('categories');
-  const categoryId =
+  const rawCategoryId =
     ci !== -1 && parts[ci + 1] && parts[ci + 1] !== 'new' ? parts[ci + 1] : null;
+  const categoryId = rawCategoryId && isObjectIdLike(rawCategoryId) ? rawCategoryId : null;
+
   return { tournamentId, categoryId };
 }
 

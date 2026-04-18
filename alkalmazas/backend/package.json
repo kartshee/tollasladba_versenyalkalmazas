@@ -8,7 +8,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon index.js",
     "selftest": "node src/scripts/selftest.js",
-    "seed:demo": "node src/scripts/seed_demo.js",
+    "seed:demo": "node src/scripts/seed_demo.js --replace",
     "smoke:e2e": "node src/scripts/e2e_smoke.js",
     "smoke:withdraw": "node src/scripts/e2e_withdraw.js",
     "cleanup:smoke": "node src/scripts/cleanup_smoke.js",
@@ -27,7 +27,8 @@
     "smoke:playoff-only": "node src/scripts/e2e_playoff_only.js",
     "smoke:umpire": "node src/scripts/e2e_umpire.js",
     "smoke:board": "node src/scripts/e2e_public_board.js",
-    "smoke:playoff-sizes": "node src/scripts/e2e_playoff_sizes.js"
+    "smoke:playoff-sizes": "node src/scripts/e2e_playoff_sizes.js",
+    "seed:demo:append": "node src/scripts/seed_demo.js"
   },
   "keywords": [],
   "author": "",

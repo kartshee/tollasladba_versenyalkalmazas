@@ -15,12 +15,11 @@ import { generatePartialRoundRobin } from '../services/roundRobin.service.js';
 import { buildSchedule } from '../services/scheduler.service.js';
 import { computeStandings } from '../services/standings.service.js';
 import { buildSeededBracketPairs, getInitialPlayoffRoundName, PLAYOFF_BRONZE_ROUND } from '../services/playoff.service.js';
+import { hashPassword } from '../services/auth.service.js';
 
-function getArgValue(name, def = null) {
-  const pfx = `${name}=`;
-  const hit = process.argv.find((a) => a.startsWith(pfx));
-  return hit ? hit.slice(pfx.length) : def;
-}
+const DEMO_EMAIL = 'demo@tollas.local';
+const DEMO_PASSWORD = 'Demo123!';
+const DEMO_NAME = 'Demo Admin';
 
 function makePairKey(a, b) {
   const x = String(a);
@@ -82,17 +81,37 @@ async function cascadeDeleteTournaments(tournamentIds) {
   await Tournament.deleteMany({ _id: { $in: tournamentIds } });
 }
 
-async function resolveOwner() {
-  const emailArg = getArgValue('--email', null);
-  if (emailArg) {
-    const owner = await User.findOne({ email: emailArg.trim().toLowerCase() }).lean();
-    if (!owner) throw new Error(`User not found for email: ${emailArg}`);
-    return owner;
+async function ensureDemoUser({ replace = false }) {
+  let existing = await User.findOne({ email: DEMO_EMAIL });
+
+  if (replace && existing) {
+    const existingTournaments = await Tournament.find({ ownerId: existing._id }).select('_id').lean();
+    await cascadeDeleteTournaments(existingTournaments.map((t) => t._id));
+    await User.deleteOne({ _id: existing._id });
+    existing = null;
   }
 
-  const latest = await User.findOne({ role: 'admin' }).sort({ createdAt: -1 }).lean();
-  if (!latest) throw new Error('No admin user found. Pass --email=<user@example.com>.');
-  return latest;
+  const passwordHash = await hashPassword(DEMO_PASSWORD);
+
+  if (!existing) {
+    existing = await User.create({
+      name: DEMO_NAME,
+      email: DEMO_EMAIL,
+      passwordHash,
+      role: 'admin'
+    });
+  } else {
+    existing.name = DEMO_NAME;
+    existing.role = 'admin';
+    existing.passwordHash = passwordHash;
+    await existing.save();
+  }
+
+  return {
+    owner: existing.toObject ? existing.toObject() : existing,
+    email: DEMO_EMAIL,
+    password: DEMO_PASSWORD
+  };
 }
 
 async function createEntriesForPlayers({ tournament, category, players, paymentGroup = null, paidPlayerIds = new Set(), billingPrefix = '' }) {
@@ -610,48 +629,33 @@ async function createAuditTrail({ owner, tournament, categories }) {
   await AuditLog.insertMany(logs);
 }
 
-async function main() {
-  if (!process.env.MONGO_URI) {
-    throw new Error('Missing MONGO_URI in environment');
-  }
-
-  const replace = process.argv.includes('--replace');
-
-  await mongoose.connect(process.env.MONGO_URI);
-
-  const owner = await resolveOwner();
-
-  if (!owner || !isValidObjectId(owner._id)) {
-    throw new Error('Could not resolve owner user');
-  }
-
-  if (replace) {
-    const existingDemoTournaments = await Tournament.find({ ownerId: owner._id, name: /^DEMO FRONTEND/i }).select('_id').lean();
-    await cascadeDeleteTournaments(existingDemoTournaments.map((t) => t._id));
-  }
-
+async function seedTournamentBundle({
+  owner,
+  name,
+  location,
+  date,
+  courtsCount = 4,
+  entryFeeAmount = 3500,
+  referees = ['Szabó Gergely', 'Kiss András', 'Németh Péter']
+}) {
   const tournament = await Tournament.create({
     ownerId: owner._id,
-    name: 'DEMO FRONTEND – Tavaszi Tollas Verseny',
-    date: new Date(),
-    location: 'Kecskemét Városi Sportcsarnok',
+    name,
+    date,
+    location,
     status: 'running',
     config: {
-      courtsCount: 4,
+      courtsCount,
       estimatedMatchMinutes: 35,
       minRestPlayerMinutes: 20,
       minRestRefereeMinutes: 10,
       courtTurnoverMinutes: 5,
       checkInGraceMinutesDefault: 30,
       entryFeeEnabled: true,
-      entryFeeAmount: 3500,
+      entryFeeAmount,
       matchRules: { bestOf: 3, pointsToWin: 21, winBy: 2, cap: 30 }
     },
-    referees: [
-      { name: 'Szabó Gergely' },
-      { name: 'Kiss András' },
-      { name: 'Németh Péter' }
-    ]
+    referees: referees.map((r) => ({ name: r }))
   });
 
   const refereeNames = tournament.referees.map((r) => r.name);
@@ -704,7 +708,7 @@ async function main() {
 
   const seededA = await seedGroupPlayoffCategory({ tournament, category: categoryA, refereeNames });
   const seededB = await seedGroupCategory({ tournament, category: categoryB, refereeNames });
-  const seededC = await seedPlayoffOnlyCategory({ tournament, category: categoryC, refereeNames });
+  await seedPlayoffOnlyCategory({ tournament, category: categoryC, refereeNames });
 
   await createAuditTrail({ owner, tournament, categories: [categoryA, categoryB, categoryC] });
 
@@ -718,10 +722,8 @@ async function main() {
     AuditLog.countDocuments({ tournamentId: tournament._id })
   ]);
 
-  console.log('Demo seed created successfully.');
-  console.log({
-    ownerEmail: owner.email,
-    tournamentId: String(tournament._id),
+  return {
+    tournament,
     categoryIds: {
       groupPlayoff: String(categoryA._id),
       groupOnly: String(categoryB._id),
@@ -739,17 +741,99 @@ async function main() {
       matches: totals[4],
       paymentGroups: totals[5],
       auditLogs: totals[6]
+    }
+  };
+}
+
+async function main() {
+  if (!process.env.MONGO_URI) {
+    throw new Error('Missing MONGO_URI in environment');
+  }
+
+  const replace = process.argv.includes('--replace');
+
+  await mongoose.connect(process.env.MONGO_URI);
+
+  const { owner, email, password } = await ensureDemoUser({ replace });
+
+  if (!owner || !isValidObjectId(owner._id)) {
+    throw new Error('Could not create demo owner user');
+  }
+
+  const seededTournaments = [];
+
+  seededTournaments.push(
+    await seedTournamentBundle({
+      owner,
+      name: 'DEMO FRONTEND – Tavaszi Tollas Verseny',
+      location: 'Kecskemét Városi Sportcsarnok',
+      date: new Date(),
+      courtsCount: 4,
+      entryFeeAmount: 3500,
+      referees: ['Szabó Gergely', 'Kiss András', 'Németh Péter']
+    })
+  );
+
+  seededTournaments.push(
+    await seedTournamentBundle({
+      owner,
+      name: 'DEMO FRONTEND – Nyárzáró Kupa',
+      location: 'Szegedi Városi Sportcsarnok',
+      date: minutesFrom(new Date(), 24 * 60),
+      courtsCount: 5,
+      entryFeeAmount: 4000,
+      referees: ['Fodor Tamás', 'Varga Attila', 'Nagy Zoltán']
+    })
+  );
+
+  const grandTotals = seededTournaments.reduce(
+    (acc, item) => {
+      acc.categories += item.counts.categories;
+      acc.players += item.counts.players;
+      acc.entries += item.counts.entries;
+      acc.groups += item.counts.groups;
+      acc.matches += item.counts.matches;
+      acc.paymentGroups += item.counts.paymentGroups;
+      acc.auditLogs += item.counts.auditLogs;
+      return acc;
     },
-    notes: [
-      'A group+playoff kategóriában a csoportkör kész, az elődöntők lejátszva, a döntő fut, a bronzmeccs hamarosan kezdődik.',
-      'A group kategóriában vegyes állapotú meccsek vannak: finished, running és pending.',
-      'A playoff-only kategóriában az elődöntők kész, a döntő és a bronzmeccs pending.',
-      'Van nevezési díj, payment group, check-in adat, umpire név és boardhoz futó/következő meccs is.'
-    ]
+    {
+      categories: 0,
+      players: 0,
+      entries: 0,
+      groups: 0,
+      matches: 0,
+      paymentGroups: 0,
+      auditLogs: 0
+    }
+  );
+
+  console.log('\nDemo seed created successfully.\n');
+  console.log('Belépési adatok:');
+  console.log(`  email: ${email}`);
+  console.log(`  password: ${password}`);
+
+  console.log('\nLétrehozott versenyek:');
+  seededTournaments.forEach((item, idx) => {
+    console.log(`\n${idx + 1}. ${item.tournament.name}`);
+    console.log(`  tournamentId: ${String(item.tournament._id)}`);
+    console.log('  categoryIds:', item.categoryIds);
+    console.log('  groupIds:', item.groupIds);
+    console.log('  counts:', item.counts);
   });
+
+  console.log('\nÖsszesített darabszámok:');
+  console.log(grandTotals);
+
+  console.log('\nMegjegyzés:');
+  console.log('- Mindkét verseny ugyanahhoz az 1 demo userhez tartozik.');
+  console.log('- Van group+playoff, group-only és playoff-only kategória is.');
+  console.log('- Van finished, running és pending meccs is.');
+  console.log('- Van check-in, entry, payment group, audit log és umpire adat is.');
 
   await mongoose.disconnect();
 }
+
 
 main().catch(async (e) => {
   console.error(e);

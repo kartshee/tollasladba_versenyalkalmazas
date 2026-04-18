@@ -43,6 +43,10 @@ const routes = [
   { path: '/tournaments/:id/admin', component: AdminPage, layout: 'app', access: 'private' },
 ];
 
+function isObjectIdLike(value) {
+  return /^[0-9a-fA-F]{24}$/.test(String(value ?? ''));
+}
+
 function normalizePath(pathname) {
   if (!pathname) return '/';
   const trimmed = pathname.replace(/\/+$/, '');
@@ -61,7 +65,12 @@ function matchPath(pathname, pattern) {
     const value = actual[i];
 
     if (segment.startsWith(':')) {
-      params[segment.slice(1)] = decodeURIComponent(value);
+      const paramName = segment.slice(1);
+      const decodedValue = decodeURIComponent(value);
+      if ((paramName === 'id' || paramName.endsWith('Id')) && !isObjectIdLike(decodedValue)) {
+        return null;
+      }
+      params[paramName] = decodedValue;
       continue;
     }
 
