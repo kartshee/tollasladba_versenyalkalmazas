@@ -36,33 +36,45 @@ function HowItWorks({ open, onToggle }) {
       {open && (
         <div className="howto-block__body">
           <p>
-            Ezen az oldalon a <strong>verseny globális kereteit</strong> állítod be – ezek az egész versenyre vonatkoznak,
-            nem kategóriánként értelmezendők.
+            Ezen az oldalon a <strong>verseny globális kereteit</strong> állítod be. Ezek az egész versenyre vonatkozó
+            alapértékek, amelyeket a kategóriák létrehozásakor később részben felül is lehet bírálni.
           </p>
           <h4>Pályák és ütemezés</h4>
           <p>
-            A <em>pályák száma</em> határozza meg, hány meccs futhat párhuzamosan. A <em>becsült meccsidő</em> és a
-            <em> pihenőidők</em> alapján a rendszer automatikusan oszt el meccseket, hogy ne kelljen kézzel ütemezni.
-            A check-in türelmi idő azt jelenti, hogy a meccs tervezett kezdete előtt hány perccel kell a játékosnak
-            megjelennie – ha nem jelent meg, a rendszer azt jelzi.
+            A <em>pályák száma</em> határozza meg, hány meccs futhat egyszerre. A <em>becsült meccsidő</em>, a
+            <em> játékospihenő</em> és a <em>pályaforgatási idő</em> alapján a rendszer később automatikus menetrendet tud készíteni.
+            A menetrend generálása külön admin művelet az Ütemezés oldalon történik, vagyis előbb a meccsek jönnek létre,
+            és csak utána kapnak pályát és időpontot.
           </p>
           <h4>Meccsszabályok</h4>
           <p>
-            A <em>Best of</em> beállítás meghatározza, hány nyert szettig tart egy meccs (BO3 = aki előbb nyer 2-t).
-            A <em>ponthatár</em> és <em>pontelőny</em> a szett végét szabja meg – tollaslabdában általában 21 pontig,
-            2 pontos előnnyel, 30-as plafonnal.
+            A <em>szettrendszer</em> beállítás meghatározza, hány nyert szettig tart egy meccs. A <em>ponthatár</em>, a
+            <em> pontelőny</em> és a <em>pontplafon</em> együtt írják le a szettek lezárási logikáját. Tollaslabdában az
+            alapértelmezett forma tipikusan 21 pont, 2 pontos különbség és 30 pontos plafon.
           </p>
           <h4>Kategóriák</h4>
           <p>
-            A verseny létrehozása után <strong>kategóriákat</strong> kell felvenni (pl. Felnőtt férfi egyes, Vegyes
-            páros stb.). Kategóriánként külön lehet beállítani a formátumot (csoportkör, playoff, vegyes),
-            a csoportméretet és a továbbjutók számát. A meccsszabályokat is felül lehet bírálni kategóriánként.
+            A verseny létrehozása után <strong>kategóriákat</strong> kell felvenni. Kategóriánként adható meg, hogy csak
+            csoportkör legyen, csoportkörből rájátszás következzen, vagy eleve tisztán egyenes kieséses legyen a lebonyolítás.
+          </p>
+          <h4>Csonka körmérkőzés</h4>
+          <p>
+            Nagyobb csoportoknál nem mindig célszerű teljes körmérkőzést játszatni, mert túl sok meccset eredményezne.
+            Ilyenkor a rendszer csonka körmérkőzést használhat: minden játékos csak meghatározott számú ellenféllel játszik,
+            de a párosítás úgy készül, hogy ne legyen önellenfél, ne legyen duplikált párosítás, és a meccsszám a játékosok
+            között a lehető legegyenletesebben oszoljon el.
+          </p>
+          <h4>Holtverseny és továbbjutás</h4>
+          <p>
+            A csoportokban a rendszer több szintű holtverseny-feloldást használ. Két játékos esetén az egymás elleni eredmény,
+            több játékos esetén mini-tabella is számíthat. Ha ezt engedélyezed, a rendszer szükség esetén az összesített szett-
+            és pontkülönbséget is figyelembe veszi.
           </p>
           <h4>Sorsolás és menetrend</h4>
           <p>
-            A nevezések felvétele és a check-in után a <em>Sorsolás lezárása</em> gomb hozza létre a csoportokat és
-            generálja a meccseket. Ezután az ütemező automatikusan pályákhoz és időpontokhoz rendeli a meccseket –
-            ezt az <em>Ütemezés</em> oldalon lehet elindítani és finomhangolni.
+            A nevezések és a check-in után a <em>Sorsolás lezárása</em> hozza létre a csoportokat és a meccseket. Ezután a
+            <em>Menetrend generálása</em> osztja ki az időpontokat és a pályákat. A két lépés különválasztása azért hasznos,
+            mert a szervező előbb ellenőrizheti a mezőnyt, és csak utána készíti el a tényleges versenynapi menetrendet.
           </p>
         </div>
       )}
@@ -127,7 +139,7 @@ export function TournamentCreatePage() {
 
   return (
     <div className="stack-xl">
-      <BackLink to="/">Vissza a dashboardra</BackLink>
+      <BackLink to="/">Vissza a főoldalra</BackLink>
       <PageHeader
         eyebrow="Új verseny"
         title="Verseny konfigurálása"
@@ -156,7 +168,7 @@ export function TournamentCreatePage() {
               </div>
             </SectionCard>
 
-            <SectionCard title="Pályák és ütemezés" subtitle="A scheduler kiindulási paraméterei.">
+            <SectionCard title="Pályák és ütemezés" subtitle="Az ütemező kiindulási paraméterei.">
               <div className="form-grid form-grid--two">
                 <FormField label="Pályák száma" htmlFor="courts" hintText="Egyszerre használható pályák maximuma.">
                   <input id="courts" type="number" min="1" max="50" value={form.courtsCount} onChange={(e) => update('courtsCount', e.target.value)} />
@@ -173,7 +185,7 @@ export function TournamentCreatePage() {
                 <FormField label="Pályaforgatási idő (perc)" htmlFor="courtTurnoverMinutes" hintText="Technikai átmenet meccsek között.">
                   <input id="courtTurnoverMinutes" type="number" min="0" max="120" value={form.courtTurnoverMinutes} onChange={(e) => update('courtTurnoverMinutes', e.target.value)} />
                 </FormField>
-                <FormField label="Check-in türelmi idő (perc)" htmlFor="checkInGraceMinutesDefault" hintText="Hány perccel a meccs előtt kell megjelennie a játékosnak. Kategóriánként felülbírálható.">
+                <FormField label="Jelenléti türelmi idő (perc)" htmlFor="checkInGraceMinutesDefault" hintText="Hány perccel a meccs előtt kell megjelennie a játékosnak. Kategóriánként felülbírálható.">
                   <input id="checkInGraceMinutesDefault" type="number" min="0" max="120" value={form.checkInGraceMinutesDefault} onChange={(e) => update('checkInGraceMinutesDefault', e.target.value)} />
                 </FormField>
               </div>
@@ -181,11 +193,11 @@ export function TournamentCreatePage() {
 
             <SectionCard title="Meccsszabályok" subtitle="Az egész versenyre vonatkozó alapértelmezés – kategóriánként felülbírálható.">
               <div className="form-grid form-grid--two">
-                <FormField label="Szett rendszer (Best of)" htmlFor="bestOf">
+                <FormField label="Szettrendszer" htmlFor="bestOf">
                   <select id="bestOf" value={form.bestOf} onChange={(e) => update('bestOf', Number(e.target.value))}>
-                    <option value={1}>Best of 1</option>
-                    <option value={3}>Best of 3</option>
-                    <option value={5}>Best of 5</option>
+                    <option value={1}>1 nyert szettig</option>
+                    <option value={3}>2 nyert szettig</option>
+                    <option value={5}>3 nyert szettig</option>
                   </select>
                 </FormField>
                 <FormField label="Szett hossza (pont)" htmlFor="pointsToWin" hintText="Általában 21.">

@@ -404,7 +404,7 @@ router.post('/:id/finalize-draw', async (req, res) => {
 
     const groups = [];
     for (let i = 0; i < groupsCount; i++) {
-        const name = `Group ${String.fromCharCode(65 + i)}`;
+        const name = `Csoport ${String.fromCharCode(65 + i)}`;
         groups.push(
             await Group.create({
                 tournamentId: category.tournamentId,

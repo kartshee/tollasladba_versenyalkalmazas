@@ -13,16 +13,16 @@ const ACTION_LABELS = {
   'tournament.finished': 'Verseny lezárva',
   'category.created': 'Kategória létrehozva',
   'category.updated': 'Kategória módosítva',
-  'category.draw_finalized': 'Draw lezárva',
+  'category.draw_finalized': 'Sorsolás lezárva',
   'player.bulk_added': 'Játékosok tömeges felvétele',
-  'player.checkin': 'Check-in jelölés',
+  'player.checkin': 'Jelenlét jelölés',
   'group.schedule_generated': 'Ütemezés generálva',
   'match.result_set': 'Eredmény rögzítve',
   'match.result_updated': 'Eredmény javítva',
   'match.outcome_set': 'Speciális lezárás',
   'match.status_changed': 'Státuszváltás',
-  'playoff.generated': 'Playoff generálva',
-  'playoff.advanced': 'Playoff következő kör',
+  'playoff.generated': 'Rájátszás generálva',
+  'playoff.advanced': 'Rájátszás következő kör',
   'payment_group.created': 'Fizetési csoport létrehozva',
   'payment_group.updated': 'Fizetési csoport módosítva',
 };
@@ -121,8 +121,8 @@ export function AdminPage({ params }) {
     <div className="stack-xl">
       <BackLink to={`/tournaments/${id}`}>Vissza a versenyhez</BackLink>
       <PageHeader
-        eyebrow="Admin"
-        title="Export és műveleti napló"
+        eyebrow="Adminisztráció"
+        title="Exportok és műveleti napló"
         description="CSV exportok letöltése és a rendszer műveleti naplójának áttekintése."
       />
 
@@ -131,7 +131,7 @@ export function AdminPage({ params }) {
       <div className="page-grid">
         <div className="page-grid__main stack-lg">
 
-          <SectionCard title="CSV Export" subtitle="Az adatok letölthetők CSV formátumban, táblázatkezelőben megnyithatók.">
+          <SectionCard title="CSV export" subtitle="Az adatok letölthetők CSV formátumban, táblázatkezelőben megnyithatók.">
             <div className="form-grid form-grid--two" style={{ marginBottom: '1.25rem' }}>
               <div>
                 <label className="form-label" htmlFor="export-category">Szűrés kategóriára (opcionális)</label>
@@ -141,7 +141,7 @@ export function AdminPage({ params }) {
                 </select>
               </div>
               <div>
-                <label className="form-label" htmlFor="export-group">Tabella – Csoport kiválasztása</label>
+                <label className="form-label" htmlFor="export-group">Tabellaexport – csoport kiválasztása</label>
                 <select id="export-group" value={exportGroupId} onChange={(e) => setExportGroupId(e.target.value)}>
                   <option value="">— válassz csoportot —</option>
                   {categoryGroups.map((g) => <option key={g._id} value={g._id}>{g.name}</option>)}
@@ -163,8 +163,8 @@ export function AdminPage({ params }) {
 
               <div className="export-card">
                 <div className="export-card__info">
-                  <strong>Játékos / Check-in lista</strong>
-                  <span className="muted">Játékosok club-adattal, check-in státusszal.</span>
+                  <strong>Játékos / jelenléti lista</strong>
+                  <span className="muted">Játékosok klubadattal és jelenléti állapottal.</span>
                   {exportCategoryId ? <span className="hint-text">Szűrve: {categories.find((c) => c._id === exportCategoryId)?.name}</span> : null}
                 </div>
                 <button className="button button--primary" type="button" onClick={() => downloadCsv(playersCsvPath)}>
@@ -245,7 +245,7 @@ export function AdminPage({ params }) {
             <ul className="bullet-list">
               <li>A CSV fájlok táblázatkezelőben (pl. Excel, LibreOffice Calc) megnyithatók.</li>
               <li>Meccslista és játékoslista kategóriaszűrővel szűkíthető.</li>
-              <li>Tabella exporthoz ki kell választani a konkrét csoportot.</li>
+              <li>A tabellaexporthoz ki kell választani a konkrét csoportot.</li>
             </ul>
           </SectionCard>
         </aside>

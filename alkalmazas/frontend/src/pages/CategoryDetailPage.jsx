@@ -6,19 +6,7 @@ import { StatCard } from '../components/StatCard.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
-
-
-function unresolvedPolicyLabel(v) {
-  if (v === 'shared_place') return 'Közös helyezés';
-  if (v === 'manual_override') return 'Manuális döntés';
-  return v ?? '—';
-}
-
-function multiTiePolicyLabel(v) {
-  if (v === 'direct_only') return 'Csak mini-tabella';
-  if (v === 'direct_then_overall') return 'Mini-tabella, majd összesített';
-  return v ?? '—';
-}
+import { formatCategoryFormat, formatMultiTiePolicy, formatStatusLabel, formatUnresolvedTiePolicy, toneForStatus } from '../services/formatters.jsx';
 
 export function CategoryDetailPage({ params }) {
   const { id, categoryId } = params;
@@ -47,7 +35,7 @@ export function CategoryDetailPage({ params }) {
     try {
       const updated = await api.post(`/api/categories/${categoryId}/finalize-draw`, {}, { token: auth.token });
       await api.get(`/api/categories/${categoryId}`, { token: auth.token }).then(setCategory);
-      window.alert(`Sorsolás lezárva. Generált meccsek: ${updated.generatedMatches}`);
+      window.alert(`A sorsolás lezárult. Generált meccsek száma: ${updated.generatedMatches}`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -63,17 +51,17 @@ export function CategoryDetailPage({ params }) {
       <PageHeader
         eyebrow="Kategória műveletek"
         title={category.name}
-        description="Innen érhetők el a sorsolás, tabella, playoff és egyéb kategória-szintű műveletek."
+        description="Innen érhetők el a sorsolás, a tabella, a rájátszás és az egyéb kategória-szintű műveletek."
         action={<AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${categoryId}/edit`}>Szerkesztés</AppLink>}
       />
 
       {error ? <div className="alert alert--error">{error}</div> : null}
 
       <div className="stats-grid">
-        <StatCard label="Formátum" value={category.format} />
-        <StatCard label="Állapot" value={category.status} />
+        <StatCard label="Formátum" value={formatCategoryFormat(category.format)} />
+        <StatCard label="Állapot" value={formatStatusLabel(category.status)} />
         <StatCard label="Továbbjutók" value={category.qualifiersPerGroup} />
-        <StatCard label="Playoff méret" value={category.playoffSize ?? '-'} />
+        <StatCard label="Rájátszás mérete" value={category.playoffSize ?? '-'} />
       </div>
 
       <div className="page-grid">
@@ -82,34 +70,39 @@ export function CategoryDetailPage({ params }) {
             <div className="quick-links">
               <button className="quick-link quick-link--button" type="button" onClick={finalizeDraw} disabled={busy}>
                 <strong>{busy ? 'Sorsolás lezárása...' : 'Sorsolás lezárása'}</strong>
-                <span>A backend a check-inelt és jogosult játékosok alapján lezárja a sorsolást és generálja a csoport- vagy playoff meccseket.</span>
+                <span>A rendszer a check-inelt és jogosult játékosok alapján lezárja a sorsolást, létrehozza a csoportokat, majd generálja a meccseket.</span>
               </button>
               <AppLink className="quick-link" to={`/tournaments/${id}/categories/${categoryId}/standings`}>
                 <strong>Tabella</strong>
-                <span>Csoportállás, holtverseny állapot és közös helyezés jelzések.</span>
+                <span>Csoportállás, holtverseny-feloldás és közös helyezések követése.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/categories/${categoryId}/playoff`}>
-                <strong>Playoff</strong>
-                <span>Ágrajz nézet, bronzmeccs és továbbjutás követése.</span>
+                <strong>Rájátszás</strong>
+                <span>Ágfa, bronzmeccs és továbbjutás kezelése.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/matches`}>
-                <strong>Meccsek oldal</strong>
+                <strong>Meccsek</strong>
                 <span>Eredményrögzítés, státuszkezelés és játékvezető hozzárendelés.</span>
               </AppLink>
             </div>
           </SectionCard>
 
-          <SectionCard title="Kategória magyarázat" subtitle="A beállított policyk jelentése.">
+          <SectionCard title="Kategória magyarázat" subtitle="A beállított szabályok rövid értelmezése.">
             <div className="key-value-list">
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Többfős holtverseny</span>
-                <span className="key-value-list__value">{multiTiePolicyLabel(category.multiTiePolicy)}</span>
+                <span className="key-value-list__value">{formatMultiTiePolicy(category.multiTiePolicy)}</span>
               </div>
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Feloldhatatlan holtverseny</span>
-                <span className="key-value-list__value">{unresolvedPolicyLabel(category.unresolvedTiePolicy)}</span>
+                <span className="key-value-list__value">{formatUnresolvedTiePolicy(category.unresolvedTiePolicy)}</span>
               </div>
             </div>
+            <ul className="bullet-list" style={{ marginTop: '1rem' }}>
+              <li>A sorsolás lezárása után jön létre a tényleges meccsállomány.</li>
+              <li>Az időpontok és pályák kiosztása külön, az Ütemezés oldalon történik.</li>
+              <li>A rájátszásos kategóriák végső helyezése a playoff eredményeiből áll össze.</li>
+            </ul>
           </SectionCard>
         </div>
 
@@ -118,28 +111,28 @@ export function CategoryDetailPage({ params }) {
             <div className="key-value-list">
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Formátum</span>
-                <span className="key-value-list__value">{category.format}</span>
+                <span className="key-value-list__value">{formatCategoryFormat(category.format)}</span>
               </div>
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Állapot</span>
-                <span className="key-value-list__value"><StatusBadge>{category.status}</StatusBadge></span>
+                <span className="key-value-list__value"><StatusBadge tone={toneForStatus(category.status)}>{formatStatusLabel(category.status)}</StatusBadge></span>
               </div>
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Csoportok</span>
                 <span className="key-value-list__value">{category.groupsCount}</span>
               </div>
               <div className="key-value-list__row">
-                <span className="key-value-list__label">RR meccsszám</span>
+                <span className="key-value-list__label">Csonka körmérkőzés célérték</span>
                 <span className="key-value-list__value">{category.groupStageMatchesPerPlayer ?? '-'}</span>
               </div>
             </div>
           </SectionCard>
 
-          <SectionCard title="Tervezett következő lépés">
+          <SectionCard title="Ajánlott következő lépés">
             <ul className="bullet-list">
               <li>Nevezések és check-in ellenőrzése.</li>
-              <li>Sorsolás lezárása.</li>
-              <li>Meccsek és tabella nyomon követése.</li>
+              <li>A sorsolás lezárása.</li>
+              <li>Tabella, eredmények és menetrend nyomon követése.</li>
             </ul>
           </SectionCard>
         </aside>

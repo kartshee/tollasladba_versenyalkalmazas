@@ -13,10 +13,10 @@ export function AuthLayout({ children }) {
           </div>
 
           <div className="auth-brand-features">
-            <div className="auth-brand-feature">Csoportkör és playoff kezelés</div>
+            <div className="auth-brand-feature">Csoportkör és rájátszás kezelése</div>
             <div className="auth-brand-feature">Valós idejű eredményrögzítés</div>
             <div className="auth-brand-feature">Automatikus ütemezés és pályabeosztás</div>
-            <div className="auth-brand-feature">Kijelzős board nézet</div>
+            <div className="auth-brand-feature">Kijelzős nézet</div>
           </div>
         </div>
 

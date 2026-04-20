@@ -22,15 +22,22 @@ export function formatDateOnly(value) {
   }
 }
 
+export function formatDateTimeLocalInput(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 export function formatStatusLabel(status) {
   const labels = {
     draft: 'Tervezet',
     running: 'Folyamatban',
     finished: 'Lezárt',
-    setup: 'Beállítás',
-    checkin_open: 'Check-in nyitva',
+    setup: 'Beállítás alatt',
+    checkin_open: 'Jelenléti időszak nyitva',
     draw_locked: 'Sorsolás lezárva',
-    in_progress: 'Folyamatban',
+    in_progress: 'Lebonyolítás alatt',
     completed: 'Befejezve',
     pending: 'Várakozik',
     group: 'Csoportkör',
@@ -45,6 +52,45 @@ export function toneForStatus(status) {
   return 'neutral';
 }
 
+export function formatTournamentStatus(status) {
+  return formatStatusLabel(status);
+}
+
+export function formatCategoryFormat(value) {
+  const labels = {
+    group: 'Csoportkör',
+    'group+playoff': 'Csoportkör + rájátszás',
+    playoff: 'Egyenes kiesés',
+  };
+  return labels[value] ?? value ?? '—';
+}
+
+export function formatGender(value) {
+  const labels = {
+    male: 'férfi',
+    female: 'női',
+    mixed: 'vegyes',
+    other: 'egyéb',
+  };
+  return labels[value] ?? value ?? '—';
+}
+
+export function formatMultiTiePolicy(value) {
+  const labels = {
+    direct_only: 'Csak mini-tabella',
+    direct_then_overall: 'Mini-tabella, majd összesített mutatók',
+  };
+  return labels[value] ?? value ?? '—';
+}
+
+export function formatUnresolvedTiePolicy(value) {
+  const labels = {
+    shared_place: 'Közös helyezés',
+    manual_override: 'Kézi döntés szükséges',
+  };
+  return labels[value] ?? value ?? '—';
+}
+
 export function formatCurrency(value) {
   const amount = Number(value ?? 0);
   if (!Number.isFinite(amount)) return '0 Ft';
@@ -54,6 +100,8 @@ export function formatCurrency(value) {
 export function roundLabel(round) {
   const labels = {
     group: 'Csoportkör',
+    playoff_round_of_32: 'Legjobb 32',
+    playoff_round_of_16: 'Nyolcaddöntő',
     playoff_quarter: 'Negyeddöntő',
     playoff_semi: 'Elődöntő',
     playoff_final: 'Döntő',
@@ -66,9 +114,9 @@ export function roundLabel(round) {
 export function outcomeLabel(resultType) {
   const labels = {
     played: 'lejátszott',
-    wo: 'W.O.',
+    wo: 'játék nélkül megnyert',
     ff: 'feladás',
-    ret: 'Visszalépés',
+    ret: 'sérülés miatti feladás',
   };
   return labels[resultType] ?? resultType ?? '—';
 }

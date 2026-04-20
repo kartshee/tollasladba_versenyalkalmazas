@@ -152,7 +152,7 @@ export function MatchesPage({ params }) {
 
       <div className="page-grid">
         <div className="page-grid__main stack-lg">
-          <SectionCard title="Szűrés" subtitle="Gyorsan leszűrhető a releváns meccshalmaz kategóriára, roundra vagy státuszra.">
+          <SectionCard title="Szűrés" subtitle="Gyorsan leszűrhető a releváns meccshalmaz kategóriára, fordulóra vagy státuszra.">
             <div className="form-grid form-grid--four filters-grid">
               <FormField label="Kategória" htmlFor="matches-category-filter">
                 <select id="matches-category-filter" value={filters.categoryId} onChange={(e) => setFilters((state) => ({ ...state, categoryId: e.target.value }))}>
@@ -164,11 +164,11 @@ export function MatchesPage({ params }) {
                 <select id="matches-status-filter" value={filters.status} onChange={(e) => setFilters((state) => ({ ...state, status: e.target.value }))}>
                   <option value="all">Összes</option>
                   <option value="pending">Várakozik</option>
-                  <option value="running">Fut</option>
-                  <option value="finished">Befejezett</option>
+                  <option value="running">Folyamatban</option>
+                  <option value="finished">Lezárt</option>
                 </select>
               </FormField>
-              <FormField label="Round" htmlFor="matches-round-filter">
+              <FormField label="Forduló" htmlFor="matches-round-filter">
                 <select id="matches-round-filter" value={filters.round} onChange={(e) => setFilters((state) => ({ ...state, round: e.target.value }))}>
                   <option value="all">Összes</option>
                   {roundOptions.map((round) => <option key={round} value={round}>{roundLabel(round)}</option>)}
@@ -184,7 +184,7 @@ export function MatchesPage({ params }) {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Round</th>
+                  <th>Forduló</th>
                   <th>Játékosok</th>
                   <th>Kategória</th>
                   <th>Státusz</th>
@@ -226,9 +226,9 @@ export function MatchesPage({ params }) {
           <SectionCard title="Meccs összesítő">
             <div className="key-value-list">
               <div className="key-value-list__row"><span className="key-value-list__label">Összes meccs</span><span className="key-value-list__value">{summary.total}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Várakozó</span><span className="key-value-list__value">{summary.pending}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Fut</span><span className="key-value-list__value">{summary.running}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Befejezett</span><span className="key-value-list__value">{summary.finished}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Várakozik</span><span className="key-value-list__value">{summary.pending}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Folyamatban</span><span className="key-value-list__value">{summary.running}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Lezárt</span><span className="key-value-list__value">{summary.finished}</span></div>
             </div>
           </SectionCard>
 
@@ -244,8 +244,8 @@ export function MatchesPage({ params }) {
                 </div>
 
                 <div className="inline-actions">
-                  <button className="button button--ghost" type="button" disabled={busy || selectedMatch.status === 'pending'} onClick={() => updateStatus('pending')}>Várakozó</button>
-                  <button className="button button--secondary" type="button" disabled={busy || selectedMatch.status === 'running'} onClick={() => updateStatus('running')}>Fut</button>
+                  <button className="button button--ghost" type="button" disabled={busy || selectedMatch.status === 'pending'} onClick={() => updateStatus('pending')}>Várakozik</button>
+                  <button className="button button--secondary" type="button" disabled={busy || selectedMatch.status === 'running'} onClick={() => updateStatus('running')}>Folyamatban</button>
                 </div>
 
                 <FormField label="Játékvezető" htmlFor="match-umpire-name" hintText="A játékvezető a verseny globális erőforrása, de meccsszinten itt rendelhető hozzá.">
@@ -271,16 +271,16 @@ export function MatchesPage({ params }) {
                 <div className="stack-md">
                   <div className="section-card__title-row"><h3>Speciális lezárás</h3></div>
                   <div className="inline-actions">
-                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('wo', 'player1')}>WO player1</button>
-                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('wo', 'player2')}>WO player2</button>
+                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('wo', 'player1')}>WO – 1. játékos</button>
+                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('wo', 'player2')}>WO – 2. játékos</button>
                   </div>
                   <div className="inline-actions">
-                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ff', 'player1')}>FF player1</button>
-                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ff', 'player2')}>FF player2</button>
+                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ff', 'player1')}>FF – 1. játékos</button>
+                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ff', 'player2')}>FF – 2. játékos</button>
                   </div>
                   <div className="inline-actions">
-                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ret', 'player1')}>RET player1</button>
-                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ret', 'player2')}>RET player2</button>
+                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ret', 'player1')}>Sérülés – 1. játékos</button>
+                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ret', 'player2')}>Sérülés – 2. játékos</button>
                   </div>
                 </div>
               </div>

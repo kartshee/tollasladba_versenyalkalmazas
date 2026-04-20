@@ -5,6 +5,7 @@ import { SectionCard } from '../components/SectionCard.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
+import { formatCategoryFormat, formatStatusLabel, toneForStatus } from '../services/formatters.jsx';
 
 export function CategoriesPage({ params }) {
   const { id } = params;
@@ -44,7 +45,7 @@ export function CategoriesPage({ params }) {
 
       <div className="page-grid">
         <div className="page-grid__main stack-lg">
-          <SectionCard title="Kategórialisták" subtitle="A versenyhez tartozó összes kategória egy helyen.">
+          <SectionCard title="Kategórialista" subtitle="A versenyhez tartozó összes kategória egy helyen.">
             {loading ? <div className="muted">Betöltés...</div> : null}
             {!loading && categories.length === 0 ? <div className="muted">Még nincs kategória.</div> : null}
             {!loading && categories.length > 0 ? (
@@ -55,7 +56,7 @@ export function CategoriesPage({ params }) {
                     <th>Formátum</th>
                     <th>Csoportok</th>
                     <th>Továbbjutók</th>
-                    <th>Playoff méret</th>
+                    <th>Rájátszás mérete</th>
                     <th>Állapot</th>
                     <th>Műveletek</th>
                   </tr>
@@ -64,11 +65,13 @@ export function CategoriesPage({ params }) {
                   {categories.map((category) => (
                     <tr key={category._id}>
                       <td>{category.name}</td>
-                      <td>{category.format}</td>
+                      <td>{formatCategoryFormat(category.format)}</td>
                       <td>{category.groupsCount}</td>
                       <td>{category.qualifiersPerGroup}</td>
                       <td>{category.playoffSize ?? '-'}</td>
-                      <td><StatusBadge>{category.status}</StatusBadge></td>
+                      <td>
+                        <StatusBadge tone={toneForStatus(category.status)}>{formatStatusLabel(category.status)}</StatusBadge>
+                      </td>
                       <td>
                         <div className="inline-actions">
                           <AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${category._id}`}>Megnyitás</AppLink>
@@ -86,9 +89,9 @@ export function CategoriesPage({ params }) {
         <aside className="page-grid__side aside-stack">
           <SectionCard title="Mit kezelsz itt?">
             <ul className="bullet-list">
-              <li>A kategória formátumát: group, group+playoff vagy playoff.</li>
-              <li>A továbbjutók számát és a playoff méretét.</li>
-              <li>A holtverseny szabály és egyéb lebonyolítási szabályokat.</li>
+              <li>A kategória lebonyolítási formáját: csoportkör, csoportkör + rájátszás vagy egyenes kiesés.</li>
+              <li>A továbbjutók számát és a rájátszás méretét.</li>
+              <li>A holtverseny-feloldási szabályokat és a kapcsolódó működési elveket.</li>
             </ul>
           </SectionCard>
 
@@ -99,7 +102,7 @@ export function CategoriesPage({ params }) {
                 <span className="key-value-list__value">{categories.length}</span>
               </div>
               <div className="key-value-list__row">
-                <span className="key-value-list__label">Playoff kategóriák</span>
+                <span className="key-value-list__label">Rájátszásos kategóriák</span>
                 <span className="key-value-list__value">{categories.filter((c) => c.format !== 'group').length}</span>
               </div>
             </div>
