@@ -97,7 +97,7 @@ export function TournamentOverviewPage({ params }) {
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/schedule`}>
                 <strong>Ütemezés</strong>
-                <span>Globális scheduler és pályanézet.</span>
+                <span>Globális ütemező és pályanézet.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/board`}>
                 <strong>Board</strong>

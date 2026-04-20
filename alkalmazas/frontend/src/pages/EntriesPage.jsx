@@ -209,7 +209,7 @@ export function EntriesPage({ params }) {
                   <FormField label="Klub" htmlFor="entry-club">
                     <input id="entry-club" value={quickAdd.club} onChange={(e) => setQuickAdd((state) => ({ ...state, club: e.target.value }))} />
                   </FormField>
-                  <FormField label="Kategória" htmlFor="entry-category" hintText="A játékos létrehozásakor rögtön hozzárendelhető egy kategóriához. Ha a kategória már lezárt draw állapotban van, a játékos később csak friendly státuszban kerülhet be.">
+                  <FormField label="Kategória" htmlFor="entry-category" hintText="A játékos létrehozásakor rögtön hozzárendelhető egy kategóriához. Ha a kategória már lezárt sorsolás állapotban van, a játékos később csak friendly státuszban kerülhet be.">
                     <select id="entry-category" value={quickAdd.categoryId} onChange={(e) => setQuickAdd((state) => ({ ...state, categoryId: e.target.value }))} required>
                       <option value="">Kategória kiválasztása</option>
                       {categories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}

@@ -83,14 +83,14 @@ export function SchedulePage({ params }) {
       <BackLink to={`/tournaments/${id}`}>Vissza a versenyhez</BackLink>
       <PageHeader
         eyebrow="Ütemezés"
-        title="Globális scheduler és pályanézet"
-        description="Az ütemezés oldalon a teljes verseny pending meccsei pályákra és idősávokra oszthatók. A nézet egyszerre mutatja az operatív terhelést és a scheduler kimenetét."
+        title="Globális ütemező és pályanézet"
+        description="Az ütemezés oldalon a teljes verseny várakozó meccsei pályákra és idősávokra oszthatók. A nézet egyszerre mutatja az operatív terhelést és az ütemező kimenetét."
       />
       {error ? <div className="alert alert--error">{error}</div> : null}
 
       <div className="page-grid">
         <div className="page-grid__main stack-lg">
-          <SectionCard title="Scheduler futtatása" subtitle="A globális scheduler a teljes verseny pending meccseit osztja el a pályákon.">
+          <SectionCard title="Ütemező futtatása" subtitle="A globális ütemező a teljes verseny várakozó meccseit osztja el a pályákon.">
             <form className="form-grid form-grid--four filters-grid" onSubmit={runScheduler}>
               <FormField label="Pályák száma" htmlFor="schedule-courts">
                 <input id="schedule-courts" type="number" min="1" max="50" value={form.courtsCount} onChange={(e) => setForm((state) => ({ ...state, courtsCount: e.target.value }))} />
@@ -101,11 +101,11 @@ export function SchedulePage({ params }) {
               <FormField label="Játékospihenő (perc)" htmlFor="schedule-rest-minutes">
                 <input id="schedule-rest-minutes" type="number" min="0" max="240" value={form.playerRestMinutes} onChange={(e) => setForm((state) => ({ ...state, playerRestMinutes: e.target.value }))} />
               </FormField>
-              <FormField label="Fairness gap" htmlFor="schedule-fairness-gap" hintText="A globális scheduler ezt használja arra, hogy egy kategória se fusson el túlzottan a többihez képest.">
+              <FormField label="Egyenletességi küszöb" htmlFor="schedule-fairness-gap" hintText="A globális ütemező ezt használja arra, hogy egy kategória se fusson el túlzottan a többihez képest.">
                 <input id="schedule-fairness-gap" type="number" min="0" max="5" value={form.fairnessGap} onChange={(e) => setForm((state) => ({ ...state, fairnessGap: e.target.value }))} />
               </FormField>
               <div className="actions-row">
-                <button className="button button--primary" type="submit" disabled={scheduling}>{scheduling ? 'Ütemezés...' : 'Globális scheduler futtatása'}</button>
+                <button className="button button--primary" type="submit" disabled={scheduling}>{scheduling ? 'Ütemezés...' : 'Ütemező futtatása'}</button>
               </div>
             </form>
           </SectionCard>
@@ -141,7 +141,7 @@ export function SchedulePage({ params }) {
           <SectionCard title="Ütemezési összesítő" subtitle={tournament?.name ?? 'Verseny'}>
             <div className="key-value-list">
               <div className="key-value-list__row"><span className="key-value-list__label">Betervezett meccsek</span><span className="key-value-list__value">{scheduledMatches.length}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Még ütemezetlen pending</span><span className="key-value-list__value">{pendingMatches.length}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Még ütemezetlen</span><span className="key-value-list__value">{pendingMatches.length}</span></div>
               <div className="key-value-list__row"><span className="key-value-list__label">Pályák</span><span className="key-value-list__value">{tournament?.config?.courtsCount ?? '—'}</span></div>
               <div className="key-value-list__row"><span className="key-value-list__label">Jelenlegi meccsidő</span><span className="key-value-list__value">{tournament?.config?.estimatedMatchMinutes ?? '—'} perc</span></div>
             </div>

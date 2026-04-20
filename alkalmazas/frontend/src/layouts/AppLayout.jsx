@@ -55,9 +55,9 @@ export function AppLayout({ children }) {
       <aside className="sidebar">
         {/* Brand */}
         <div className="sidebar__brand">
-          <div className="brand-mark brand-mark--small">TB</div>
+          <div className="brand-mark brand-mark--small">TVR</div>
           <div>
-            <div className="sidebar__title">Tollas Admin</div>
+            <div className="sidebar__title">TVR</div>
             <div className="sidebar__subtitle">Versenykezelő rendszer</div>
           </div>
         </div>

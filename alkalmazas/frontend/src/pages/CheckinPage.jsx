@@ -107,7 +107,7 @@ export function CheckinPage({ params }) {
       <BackLink to={`/tournaments/${id}`}>Vissza a versenyhez</BackLink>
       <PageHeader
         eyebrow="Check-in"
-        title="Jelenlét és draw előkészítés"
+        title="Jelenlét és sorsolás előkészítése"
         description="A verseny napján ez az egyik fő operatív oldal: itt dől el, hogy kik a tényleges indulók, és innen indítható a sorsolás lezárása is."
       />
 
@@ -191,7 +191,7 @@ export function CheckinPage({ params }) {
             </div>
           </SectionCard>
 
-          <SectionCard title="Kategória műveletek" subtitle="A draw lezárása és a grace idő zárása kategóriánként történik.">
+          <SectionCard title="Kategória műveletek" subtitle="A sorsolás lezárása és a türelmi idő zárása kategóriánként történik.">
             <div className="stack-md">
               {categories.map((category) => (
                 <div key={category._id} className="summary-item summary-item--interactive">
@@ -205,7 +205,7 @@ export function CheckinPage({ params }) {
                   </div>
                   <div className="inline-actions">
                     <button className="button button--ghost" type="button" disabled={busyCategoryId === category._id || ['draw_locked', 'in_progress', 'completed'].includes(category.status)} onClick={() => categoryAction(category._id, 'finalize-draw')}>
-                      Draw lezárása
+                      Sorsolás lezárása
                     </button>
                     <button className="button button--ghost" type="button" disabled={busyCategoryId === category._id || !['draw_locked', 'in_progress'].includes(category.status)} onClick={() => categoryAction(category._id, 'close-grace', { force: true })}>
                       Grace lezárása

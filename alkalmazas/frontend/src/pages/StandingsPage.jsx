@@ -62,9 +62,9 @@ export function StandingsPage({ params }) {
     <div className="stack-xl">
       <BackLink to={`/tournaments/${id}/categories/${categoryId}`}>Vissza a kategóriához</BackLink>
       <PageHeader
-        eyebrow="Standings"
-        title="Csoportállás és tie-break"
-        description="A standings oldal csoportonként mutatja a helyezéseket, a tie-break eredményét, a shared place állapotot és a továbbjutási logikához fontos mutatókat."
+        eyebrow="Tabella"
+        title="Csoportállás"
+        description="A tabella csoportonként mutatja a helyezéseket, a holtverseny-döntő eredményét és a továbbjutási logikához fontos mutatókat."
         action={category ? <StatusBadge tone={toneForStatus(category.status)}>{formatStatusLabel(category.status)}</StatusBadge> : null}
       />
 
@@ -72,11 +72,29 @@ export function StandingsPage({ params }) {
 
       <div className="page-grid">
         <div className="page-grid__main stack-lg">
-          {loading ? <SectionCard title="Betöltés"><div className="muted">Standings betöltése...</div></SectionCard> : null}
+          {loading ? <SectionCard title="Betöltés"><div className="muted">Tabella betöltése...</div></SectionCard> : null}
 
           {!loading && groups.length === 0 ? (
             <SectionCard title="Nincs csoport">
-              <div className="muted">Ehhez a kategóriához még nincs létrehozott csoport, ezért standings sem számolható.</div>
+              <div className="stack-md">
+                <p className="muted">
+                  Ehhez a kategóriához még nem lett lezárva a sorsolás, ezért nem jöttek létre csoportok és
+                  tabella sem számolható.
+                </p>
+                <p className="muted">
+                  A sorsolás a <strong>Kategória műveletek</strong> oldalon indítható el a{' '}
+                  <em>Sorsolás lezárása</em> gombbal. Ez a check-inelt és jogosult játékosok alapján
+                  automatikusan létrehozza a csoportokat és generálja a meccseket.
+                </p>
+                <div>
+                  <AppLink
+                      className="button button--primary"
+                      to={`/tournaments/${id}/categories/${categoryId}`}
+                  >
+                    Ugrás a kategória műveletekhez
+                  </AppLink>
+                </div>
+              </div>
             </SectionCard>
           ) : null}
 
@@ -91,10 +109,10 @@ export function StandingsPage({ params }) {
                       <th>Játékos</th>
                       <th>Győzelem</th>
                       <th>Lejátszott</th>
-                      <th>Win rate</th>
+                      <th>Győzelem %</th>
                       <th>Szett diff</th>
                       <th>Pont diff</th>
-                      <th>Tie-break</th>
+                      <th>Holtverseny</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -116,7 +134,7 @@ export function StandingsPage({ params }) {
                           {entry.tieResolved === false ? (
                             <StatusBadge tone="warning">nincs feloldva</StatusBadge>
                           ) : entry.sharedPlace ? (
-                            <StatusBadge tone="neutral">shared place</StatusBadge>
+                            <StatusBadge tone="neutral">Közös hely</StatusBadge>
                           ) : (
                             <StatusBadge tone="success">rendben</StatusBadge>
                           )}
@@ -131,16 +149,16 @@ export function StandingsPage({ params }) {
         </div>
 
         <aside className="page-grid__side aside-stack">
-          <SectionCard title="Standings összesítő" subtitle={category?.name ?? 'Kategória'}>
+          <SectionCard title="Tabella összesítő" subtitle={category?.name ?? 'Kategória'}>
             <div className="key-value-list">
               <div className="key-value-list__row"><span className="key-value-list__label">Csoportok</span><span className="key-value-list__value">{summary.groups}</span></div>
               <div className="key-value-list__row"><span className="key-value-list__label">Értékelt játékosok</span><span className="key-value-list__value">{summary.players}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Unresolved tie</span><span className="key-value-list__value">{summary.unresolved}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Döntetlen</span><span className="key-value-list__value">{summary.unresolved}</span></div>
               <div className="key-value-list__row"><span className="key-value-list__label">Shared place</span><span className="key-value-list__value">{summary.sharedPlaces}</span></div>
             </div>
           </SectionCard>
 
-          <SectionCard title="Tie-break policy" subtitle="A kategória konfigurációja alapján.">
+          <SectionCard title="Holtverseny szabály" subtitle="A kategória konfigurációja alapján.">
             {category ? (
               <ul className="bullet-list">
                 <li><strong>Többfős holtverseny:</strong> {category.multiTiePolicy === 'direct_only' ? 'csak mini-tabella' : 'mini-tabella, majd overall'}</li>
@@ -149,7 +167,7 @@ export function StandingsPage({ params }) {
             ) : <div className="muted">Betöltés...</div>}
           </SectionCard>
 
-          <SectionCard title="Következő lépés" subtitle="A standings után a playoff generálás vagy a következő fordulóba jutók meghatározása jön.">
+          <SectionCard title="Következő lépés" subtitle="A tabella után a playoff generálás vagy a következő fordulóba jutók meghatározása jön.">
             <div className="stack-md">
               <AppLink className="button button--primary button--block" to={`/tournaments/${id}/categories/${categoryId}/playoff`}>
                 Playoff megnyitása

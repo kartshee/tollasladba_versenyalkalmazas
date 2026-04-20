@@ -172,7 +172,7 @@ export function PlayoffPage({ params }) {
       <PageHeader
         eyebrow="Playoff"
         title="Playoff és bronzmeccs"
-        description="A playoff nézet a kategória teljes kieséses ágát mutatja. Innen generálható és továbbvihető a bracket, valamint gyorsan ellenőrizhető a döntő és a bronzmeccs állapota."
+        description="A playoff nézet a kategória teljes kieséses ágát mutatja. Innen generálható és továbbvihető az ágrajz, valamint gyorsan ellenőrizhető a döntő és a bronzmeccs állapota."
         action={category ? <StatusBadge tone={toneForStatus(category.status)}>{formatStatusLabel(category.status)}</StatusBadge> : null}
       />
 
@@ -183,9 +183,9 @@ export function PlayoffPage({ params }) {
           {loading ? <SectionCard title="Betöltés"><div className="muted">Playoff adatok betöltése...</div></SectionCard> : null}
 
           {!loading && category?.format === 'playoff' ? (
-            <SectionCard title="Playoff-only kategória" subtitle="A bracket eleve csoportkör nélkül indul.">
+            <SectionCard title="Playoff-only kategória" subtitle="Az ágrajz csoportkör nélkül indul.">
               {playoffOnlyMatches.length === 0 ? (
-                <div className="muted">Ehhez a kategóriához még nincs playoff draw generálva.</div>
+                <div className="muted">Ehhez a kategóriához még nincs sorsolás.</div>
               ) : (
                 <div className="bracket-grid">
                   {playoffMatchRows(playoffOnlyMatches).map((section) => (
@@ -220,7 +220,7 @@ export function PlayoffPage({ params }) {
                       <button className="button button--primary" type="button" disabled={busyKey === `generate-${group._id}`} onClick={() => generateGroupPlayoff(group._id)}>
                         Playoff generálása
                       </button>
-                      <AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${categoryId}/standings`}>Standings</AppLink>
+                      <AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${categoryId}/standings`}>Tabella</AppLink>
                     </div>
                   </div>
                 ) : (
@@ -251,15 +251,15 @@ export function PlayoffPage({ params }) {
           <SectionCard title="Playoff összesítő" subtitle={category?.name ?? 'Kategória'}>
             <div className="key-value-list">
               <div className="key-value-list__row"><span className="key-value-list__label">Összes playoff meccs</span><span className="key-value-list__value">{summary.total}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Pending</span><span className="key-value-list__value">{summary.pending}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Running</span><span className="key-value-list__value">{summary.running}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Várakozó</span><span className="key-value-list__value">{summary.pending}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Fut</span><span className="key-value-list__value">{summary.running}</span></div>
               <div className="key-value-list__row"><span className="key-value-list__label">Finished</span><span className="key-value-list__value">{summary.finished}</span></div>
             </div>
           </SectionCard>
 
           <SectionCard title="Kijelölt playoff meccs" subtitle="Gyors eredményrögzítés a playoff nézetből.">
             {!selectedMatch ? (
-              <div className="muted">Válassz egy meccset a bracketből.</div>
+              <div className="muted">Válassz egy meccset az ágrajzból.</div>
             ) : (
               <form className="stack-md" onSubmit={saveSelectedResult}>
                 <div className="readonly-field">
@@ -268,8 +268,8 @@ export function PlayoffPage({ params }) {
                   <span className="readonly-field__help">{roundLabel(selectedMatch.round)} • {formatDateTime(selectedMatch.startAt)}</span>
                 </div>
                 <div className="inline-actions">
-                  <button className="button button--ghost" type="button" onClick={() => updateSelectedStatus('running')}>Running</button>
-                  <button className="button button--ghost" type="button" onClick={() => updateSelectedStatus('pending')}>Pending</button>
+                  <button className="button button--ghost" type="button" onClick={() => updateSelectedStatus('running')}>Fut</button>
+                  <button className="button button--ghost" type="button" onClick={() => updateSelectedStatus('pending')}>Várakozó</button>
                 </div>
                 {resultRows.map((row, index) => (
                   <div key={`playoff-set-${index}`} className="score-row">

@@ -1474,3 +1474,56 @@ textarea { resize: vertical; }
   border-radius: 8px;
   font-size: 0.9rem;
 }
+
+/* ─────────────────────────────────────────────
+   HOW-TO EXPANDABLE BLOCK (TournamentCreate)
+───────────────────────────────────────────── */
+.howto-block {
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.howto-block__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.125rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-align: left;
+}
+
+.howto-block__toggle:hover {
+  background: var(--surface-alt);
+}
+
+.howto-block__chevron {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.howto-block__body {
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--text-soft);
+}
+
+.howto-block__body h4 {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 1rem 0 0.35rem;
+}
+
+.howto-block__body p {
+  margin: 0 0 0.5rem;
+}

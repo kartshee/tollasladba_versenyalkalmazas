@@ -146,11 +146,11 @@ export function CategoryFormPage({ params }) {
               </select>
             </FormField>
             {form.format !== 'playoff' ? (
-              <FormField label="Csoportok száma" htmlFor="category-groupsCount" hintText="A draw finalizálásakor ennyi csoportot próbál létrehozni a rendszer. Ha 1, akkor egyetlen csoportban marad a mezőny.">
+              <FormField label="Csoportok száma" htmlFor="category-groupsCount" hintText="A sorsolás lezárásakor ennyi csoportot próbál létrehozni a rendszer. Ha 1, akkor egyetlen csoportban marad a mezőny.">
                 <input id="category-groupsCount" type="number" min="1" max="32" value={form.groupsCount} onChange={(e) => update('groupsCount', e.target.value)} />
               </FormField>
             ) : null}
-            <FormField label="Csoportlétszám célérték" htmlFor="category-groupSizeTarget" hintText="A csoportkörös kategóriákban ez segíti a draw felosztását és a továbbjutás logikájának tervezését.">
+            <FormField label="Csoportlétszám célérték" htmlFor="category-groupSizeTarget" hintText="A csoportkörös kategóriákban ez segíti a sorsolás felosztását és a továbbjutás logikájának tervezését.">
               <input id="category-groupSizeTarget" type="number" min="2" max="64" value={form.groupSizeTarget} onChange={(e) => update('groupSizeTarget', e.target.value)} />
             </FormField>
             {form.format !== 'playoff' ? (
@@ -177,7 +177,7 @@ export function CategoryFormPage({ params }) {
           </div>
         </SectionCard>
 
-        <SectionCard title="Tie-break policy">
+        <SectionCard title="Holtverseny szabály">
           <div className="form-grid form-grid--two">
             <FormField label="Többfős holtverseny" htmlFor="category-multiTiePolicy" hintText="Beállítható, hogy több játékos holtversenyénél csak az egymás elleni mini-tabella számítson-e, vagy utána az összes meccs statisztikája is beleszóljon.">
               <select id="category-multiTiePolicy" value={form.multiTiePolicy} onChange={(e) => update('multiTiePolicy', e.target.value)}>
@@ -187,7 +187,7 @@ export function CategoryFormPage({ params }) {
             </FormField>
             <FormField label="Feloldhatatlan holtverseny" htmlFor="category-unresolvedTiePolicy" hintText="Ha minden sportszakmai szempont után is döntetlen marad a sorrend, akkor adható közös helyezés vagy szükséges manuális döntés.">
               <select id="category-unresolvedTiePolicy" value={form.unresolvedTiePolicy} onChange={(e) => update('unresolvedTiePolicy', e.target.value)}>
-                <option value="shared_place">shared_place</option>
+                <option value="shared_place">Közös helyezés</option>
                 <option value="manual_override">manual_override</option>
               </select>
             </FormField>

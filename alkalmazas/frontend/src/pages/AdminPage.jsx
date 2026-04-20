@@ -141,7 +141,7 @@ export function AdminPage({ params }) {
                 </select>
               </div>
               <div>
-                <label className="form-label" htmlFor="export-group">Standings – Csoport kiválasztása</label>
+                <label className="form-label" htmlFor="export-group">Tabella – Csoport kiválasztása</label>
                 <select id="export-group" value={exportGroupId} onChange={(e) => setExportGroupId(e.target.value)}>
                   <option value="">— válassz csoportot —</option>
                   {categoryGroups.map((g) => <option key={g._id} value={g._id}>{g.name}</option>)}
@@ -174,7 +174,7 @@ export function AdminPage({ params }) {
 
               <div className="export-card">
                 <div className="export-card__info">
-                  <strong>Csoportállás (standings)</strong>
+                  <strong>Csoportállás (tabella)</strong>
                   <span className="muted">Helyezések, győzelmek, szett- és pontkülönbség.</span>
                   {!exportGroupId ? <span className="hint-text warning-text">Válassz csoportot a fenti szűrőből.</span> : null}
                 </div>
@@ -245,7 +245,7 @@ export function AdminPage({ params }) {
             <ul className="bullet-list">
               <li>A CSV fájlok táblázatkezelőben (pl. Excel, LibreOffice Calc) megnyithatók.</li>
               <li>Meccslista és játékoslista kategóriaszűrővel szűkíthető.</li>
-              <li>Standings exporthoz ki kell választani a konkrét csoportot.</li>
+              <li>Tabella exporthoz ki kell választani a konkrét csoportot.</li>
             </ul>
           </SectionCard>
         </aside>

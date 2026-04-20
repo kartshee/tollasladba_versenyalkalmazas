@@ -226,9 +226,9 @@ export function MatchesPage({ params }) {
           <SectionCard title="Meccs összesítő">
             <div className="key-value-list">
               <div className="key-value-list__row"><span className="key-value-list__label">Összes meccs</span><span className="key-value-list__value">{summary.total}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Pending</span><span className="key-value-list__value">{summary.pending}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Running</span><span className="key-value-list__value">{summary.running}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Finished</span><span className="key-value-list__value">{summary.finished}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Várakozó</span><span className="key-value-list__value">{summary.pending}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Fut</span><span className="key-value-list__value">{summary.running}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Befejezett</span><span className="key-value-list__value">{summary.finished}</span></div>
             </div>
           </SectionCard>
 
@@ -244,8 +244,8 @@ export function MatchesPage({ params }) {
                 </div>
 
                 <div className="inline-actions">
-                  <button className="button button--ghost" type="button" disabled={busy || selectedMatch.status === 'pending'} onClick={() => updateStatus('pending')}>Pending</button>
-                  <button className="button button--secondary" type="button" disabled={busy || selectedMatch.status === 'running'} onClick={() => updateStatus('running')}>Running</button>
+                  <button className="button button--ghost" type="button" disabled={busy || selectedMatch.status === 'pending'} onClick={() => updateStatus('pending')}>Várakozó</button>
+                  <button className="button button--secondary" type="button" disabled={busy || selectedMatch.status === 'running'} onClick={() => updateStatus('running')}>Fut</button>
                 </div>
 
                 <FormField label="Játékvezető" htmlFor="match-umpire-name" hintText="A játékvezető a verseny globális erőforrása, de meccsszinten itt rendelhető hozzá.">

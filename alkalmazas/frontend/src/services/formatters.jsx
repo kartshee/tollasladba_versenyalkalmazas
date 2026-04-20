@@ -66,9 +66,9 @@ export function roundLabel(round) {
 export function outcomeLabel(resultType) {
   const labels = {
     played: 'lejátszott',
-    wo: 'walkover',
+    wo: 'W.O.',
     ff: 'feladás',
-    ret: 'retired',
+    ret: 'Visszalépés',
   };
   return labels[resultType] ?? resultType ?? '—';
 }

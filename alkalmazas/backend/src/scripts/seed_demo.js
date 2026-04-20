@@ -710,6 +710,42 @@ async function seedTournamentBundle({
   const seededB = await seedGroupCategory({ tournament, category: categoryB, refereeNames });
   await seedPlayoffOnlyCategory({ tournament, category: categoryC, refereeNames });
 
+  // categoryD: setup állapotban maradt tesztkategória – sorsolás még nem fut le
+  // Játékosok és nevezések megvannak, check-in is megtörtént,
+  // de a draw/sorsolás lezárása még nem történt meg → itt tesztelhető az egész flow.
+  const categoryD = await Category.create({
+    tournamentId: tournament._id,
+    name: 'Teszt – Sorsolásra kész',
+    gender: 'mixed',
+    ageGroup: 'Nyílt',
+    format: 'group+playoff',
+    groupsCount: 1,
+    qualifiersPerGroup: 2,
+    playoffSize: 4,
+    groupSizeTarget: 4,
+    groupStageMatchesPerPlayer: 3,
+    multiTiePolicy: 'direct_then_overall',
+    unresolvedTiePolicy: 'shared_place',
+    status: 'setup'
+  });
+
+  const dNames = ['Balogh Réka', 'Simon Eszter', 'Fekete Zsolt', 'Papp Gábor'];
+  const dPlayers = await Player.insertMany(dNames.map((name) => ({
+    tournamentId: tournament._id,
+    categoryId: categoryD._id,
+    name,
+    club: 'Demo SC',
+    mainEligibility: 'main',
+    checkedIn: true
+  })));
+  await Entry.insertMany(dPlayers.map((p) => ({
+    tournamentId: tournament._id,
+    categoryId: categoryD._id,
+    playerId: p._id,
+    paid: true,
+    paymentGroupId: null
+  })));
+
   await createAuditTrail({ owner, tournament, categories: [categoryA, categoryB, categoryC] });
 
   const totals = await Promise.all([

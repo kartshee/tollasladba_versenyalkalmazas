@@ -7,6 +7,19 @@ import { StatusBadge } from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
 
+
+function unresolvedPolicyLabel(v) {
+  if (v === 'shared_place') return 'Közös helyezés';
+  if (v === 'manual_override') return 'Manuális döntés';
+  return v ?? '—';
+}
+
+function multiTiePolicyLabel(v) {
+  if (v === 'direct_only') return 'Csak mini-tabella';
+  if (v === 'direct_then_overall') return 'Mini-tabella, majd összesített';
+  return v ?? '—';
+}
+
 export function CategoryDetailPage({ params }) {
   const { id, categoryId } = params;
   const auth = useAuth();
@@ -34,7 +47,7 @@ export function CategoryDetailPage({ params }) {
     try {
       const updated = await api.post(`/api/categories/${categoryId}/finalize-draw`, {}, { token: auth.token });
       await api.get(`/api/categories/${categoryId}`, { token: auth.token }).then(setCategory);
-      window.alert(`Draw lezárva. Generált meccsek: ${updated.generatedMatches}`);
+      window.alert(`Sorsolás lezárva. Generált meccsek: ${updated.generatedMatches}`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -50,7 +63,7 @@ export function CategoryDetailPage({ params }) {
       <PageHeader
         eyebrow="Kategória műveletek"
         title={category.name}
-        description="Innen érhetők el a draw, standings, playoff és egyéb kategória-szintű műveletek."
+        description="Innen érhetők el a sorsolás, tabella, playoff és egyéb kategória-szintű műveletek."
         action={<AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${categoryId}/edit`}>Szerkesztés</AppLink>}
       />
 
@@ -68,16 +81,16 @@ export function CategoryDetailPage({ params }) {
           <SectionCard title="Gyors műveletek" subtitle="A legfontosabb kategória-szintű admin lépések.">
             <div className="quick-links">
               <button className="quick-link quick-link--button" type="button" onClick={finalizeDraw} disabled={busy}>
-                <strong>{busy ? 'Draw lezárása...' : 'Draw finalizálása'}</strong>
+                <strong>{busy ? 'Sorsolás lezárása...' : 'Sorsolás lezárása'}</strong>
                 <span>A backend a check-inelt és jogosult játékosok alapján lezárja a sorsolást és generálja a csoport- vagy playoff meccseket.</span>
               </button>
               <AppLink className="quick-link" to={`/tournaments/${id}/categories/${categoryId}/standings`}>
-                <strong>Standings</strong>
-                <span>Csoportállás, tie-break állapot és shared place jelzések.</span>
+                <strong>Tabella</strong>
+                <span>Csoportállás, holtverseny állapot és közös helyezés jelzések.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/categories/${categoryId}/playoff`}>
                 <strong>Playoff</strong>
-                <span>Bracket nézet, bronzmeccs és továbbjutás követése.</span>
+                <span>Ágrajz nézet, bronzmeccs és továbbjutás követése.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/matches`}>
                 <strong>Meccsek oldal</strong>
@@ -90,11 +103,11 @@ export function CategoryDetailPage({ params }) {
             <div className="key-value-list">
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Többfős holtverseny</span>
-                <span className="key-value-list__value">{category.multiTiePolicy}</span>
+                <span className="key-value-list__value">{multiTiePolicyLabel(category.multiTiePolicy)}</span>
               </div>
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Feloldhatatlan holtverseny</span>
-                <span className="key-value-list__value">{category.unresolvedTiePolicy}</span>
+                <span className="key-value-list__value">{unresolvedPolicyLabel(category.unresolvedTiePolicy)}</span>
               </div>
             </div>
           </SectionCard>
@@ -125,8 +138,8 @@ export function CategoryDetailPage({ params }) {
           <SectionCard title="Tervezett következő lépés">
             <ul className="bullet-list">
               <li>Nevezések és check-in ellenőrzése.</li>
-              <li>Draw finalizálása.</li>
-              <li>Meccsek és standings nyomon követése.</li>
+              <li>Sorsolás lezárása.</li>
+              <li>Meccsek és tabella nyomon követése.</li>
             </ul>
           </SectionCard>
         </aside>

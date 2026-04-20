@@ -88,7 +88,7 @@ export function CategoriesPage({ params }) {
             <ul className="bullet-list">
               <li>A kategória formátumát: group, group+playoff vagy playoff.</li>
               <li>A továbbjutók számát és a playoff méretét.</li>
-              <li>A tie-break policy és egyéb lebonyolítási szabályokat.</li>
+              <li>A holtverseny szabály és egyéb lebonyolítási szabályokat.</li>
             </ul>
           </SectionCard>
 
