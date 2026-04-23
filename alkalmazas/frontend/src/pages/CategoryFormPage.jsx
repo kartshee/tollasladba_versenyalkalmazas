@@ -5,7 +5,6 @@ import { SectionCard } from '../components/SectionCard.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
 import { useRouter } from '../router/router.jsx';
-import { formatMultiTiePolicy, formatUnresolvedTiePolicy } from '../services/formatters.jsx';
 
 const initialForm = {
   name: '',
@@ -114,10 +113,8 @@ export function CategoryFormPage({ params }) {
       <PageHeader
         eyebrow={isEdit ? 'Kategória szerkesztése' : 'Új kategória'}
         title={isEdit ? 'Kategória szerkesztése' : 'Új kategória létrehozása'}
-        description="A kategória határozza meg a csoportkör, a továbbjutás és a rájátszás logikáját."
+        description="A kategória határozza meg a csoportkör, a továbbjutás és a playoff logikáját."
       />
-
-      {error ? <div className="alert alert--error">{error}</div> : null}
 
       <form className="stack-xl" onSubmit={handleSubmit}>
         <SectionCard title="Alapadatok">
@@ -141,15 +138,15 @@ export function CategoryFormPage({ params }) {
 
         <SectionCard title="Lebonyolítási forma">
           <div className="form-grid form-grid--two">
-            <FormField label="Formátum" htmlFor="category-format" hintText="A kategória lehet csak csoportkörös, csoportkörből rájátszásba vezető vagy eleve tisztán egyenes kieséses.">
+            <FormField label="Formátum" htmlFor="category-format" hintText="A kategória lehet csak csoportkörös, csoportkörből playoffba vezető vagy eleve tisztán egyenes kieséses.">
               <select id="category-format" value={form.format} onChange={(e) => update('format', e.target.value)}>
-                <option value="group">Csoportkör</option>
-                <option value="group+playoff">Csoportkör + rájátszás</option>
-                <option value="playoff">Egyenes kiesés</option>
+                <option value="group">group</option>
+                <option value="group+playoff">group+playoff</option>
+                <option value="playoff">playoff</option>
               </select>
             </FormField>
             {form.format !== 'playoff' ? (
-              <FormField label="Csoportok száma" htmlFor="category-groupsCount" hintText="A sorsolás lezárásakor ennyi csoportot próbál létrehozni a rendszer. Ha 1, akkor a teljes mezőny egy csoportba kerül.">
+              <FormField label="Csoportok száma" htmlFor="category-groupsCount" hintText="A sorsolás lezárásakor ennyi csoportot próbál létrehozni a rendszer. Ha 1, akkor egyetlen csoportban marad a mezőny.">
                 <input id="category-groupsCount" type="number" min="1" max="32" value={form.groupsCount} onChange={(e) => update('groupsCount', e.target.value)} />
               </FormField>
             ) : null}
@@ -157,50 +154,50 @@ export function CategoryFormPage({ params }) {
               <input id="category-groupSizeTarget" type="number" min="2" max="64" value={form.groupSizeTarget} onChange={(e) => update('groupSizeTarget', e.target.value)} />
             </FormField>
             {form.format !== 'playoff' ? (
-              <FormField label="Meccsek száma játékosonként" htmlFor="category-groupStageMatchesPerPlayer" hintText="Csonka körmérkőzés esetén ez határozza meg, hogy egy játékos hány csoportmeccset kapjon. Nagyobb mezőnynél így csökkenthető a teljes meccsszám.">
+              <FormField label="Meccsek száma játékosonként" htmlFor="category-groupStageMatchesPerPlayer" hintText="Csonka round robin esetén ez határozza meg, hogy egy játékos hány csoportmeccset kapjon. Nagyobb mezőnynél így csökkenthető a teljes meccsszám.">
                 <input id="category-groupStageMatchesPerPlayer" type="number" min="1" max="100" value={form.groupStageMatchesPerPlayer} onChange={(e) => update('groupStageMatchesPerPlayer', e.target.value)} />
               </FormField>
             ) : null}
-            <FormField label="Továbbjutók száma" htmlFor="category-qualifiersPerGroup" hintText="Csoportkör + rájátszás esetén a csoportból ennyi játékos jut tovább a rájátszásba. A rájátszás mérete ehhez igazodik.">
+            <FormField label="Továbbjutók száma" htmlFor="category-qualifiersPerGroup" hintText="Group+playoff esetben a csoportból ennyi játékos jut tovább a playoff ágra. A playoff mérete ehhez igazodik.">
               <input id="category-qualifiersPerGroup" type="number" min="1" max="32" value={form.qualifiersPerGroup} onChange={(e) => update('qualifiersPerGroup', e.target.value)} />
             </FormField>
             {form.format === 'playoff' ? (
-              <FormField label="Rájátszás mérete" htmlFor="category-playoffSize" hintText="Tisztán egyenes kieséses kategóriánál ez adja meg a teljes tábla méretét. A jelenlegi backend pontosan ekkora indulólétszámot fogad el.">
+              <FormField label="Playoff méret" htmlFor="category-playoffSize" hintText="Playoff-only kategóriánál ez adja meg a teljes egyenes kieséses tábla méretét. A jelenlegi backend csak pontosan ekkora indulólétszámot fogad el.">
                 <select id="category-playoffSize" value={form.playoffSize} onChange={(e) => update('playoffSize', e.target.value)}>
-                  {[2, 4, 8, 16, 32].map((size) => <option key={size} value={size}>{size}</option>)}
+                  {[2,4,8,16,32].map((size) => <option key={size} value={size}>{size}</option>)}
                 </select>
               </FormField>
             ) : (
               <div className="readonly-field">
-                <span className="readonly-field__label">Rájátszás mérete</span>
+                <span className="readonly-field__label">Playoff méret</span>
                 <strong>{effectivePlayoffSize ?? '-'}</strong>
-                <span className="readonly-field__help">Csoportkör + rájátszás esetén a rájátszás mérete automatikusan a továbbjutók számából következik.</span>
+                <span className="readonly-field__help">Group+playoff esetén a playoff méret automatikusan a továbbjutók számából következik.</span>
               </div>
             )}
           </div>
         </SectionCard>
 
-        <SectionCard title="Holtverseny-feloldás">
+        <SectionCard title="Holtverseny szabály">
           <div className="form-grid form-grid--two">
-            <FormField label="Többfős holtverseny" htmlFor="category-multiTiePolicy" hintText="Beállítható, hogy több játékos holtversenyénél csak az egymás elleni mini-tabella számítson-e, vagy utána az összesített mutatók is beleszóljanak.">
+            <FormField label="Többfős holtverseny" htmlFor="category-multiTiePolicy" hintText="Beállítható, hogy több játékos holtversenyénél csak az egymás elleni mini-tabella számítson-e, vagy utána az összes meccs statisztikája is beleszóljon.">
               <select id="category-multiTiePolicy" value={form.multiTiePolicy} onChange={(e) => update('multiTiePolicy', e.target.value)}>
-                <option value="direct_only">{formatMultiTiePolicy('direct_only')}</option>
-                <option value="direct_then_overall">{formatMultiTiePolicy('direct_then_overall')}</option>
+                <option value="direct_only">direct_only</option>
+                <option value="direct_then_overall">direct_then_overall</option>
               </select>
             </FormField>
-            <FormField label="Feloldhatatlan holtverseny" htmlFor="category-unresolvedTiePolicy" hintText="Ha minden sportszakmai szempont után is döntetlen marad a sorrend, akkor adható közös helyezés vagy szükséges kézi döntés.">
+            <FormField label="Feloldhatatlan holtverseny" htmlFor="category-unresolvedTiePolicy" hintText="Ha minden sportszakmai szempont után is döntetlen marad a sorrend, akkor adható közös helyezés vagy szükséges manuális döntés.">
               <select id="category-unresolvedTiePolicy" value={form.unresolvedTiePolicy} onChange={(e) => update('unresolvedTiePolicy', e.target.value)}>
-                <option value="shared_place">{formatUnresolvedTiePolicy('shared_place')}</option>
-                <option value="manual_override">{formatUnresolvedTiePolicy('manual_override')}</option>
+                <option value="shared_place">Közös helyezés</option>
+                <option value="manual_override">manual_override</option>
               </select>
             </FormField>
           </div>
         </SectionCard>
 
+        {error ? <div className="alert alert--error">{error}</div> : null}
+
         <div className="actions-row">
-          <button className="button button--primary" type="submit" disabled={submitting}>
-            {submitting ? 'Mentés...' : isEdit ? 'Kategória mentése' : 'Kategória létrehozása'}
-          </button>
+          <button className="button button--primary" type="submit" disabled={submitting}>{submitting ? 'Mentés...' : isEdit ? 'Módosítás mentése' : 'Kategória létrehozása'}</button>
         </div>
       </form>
     </div>

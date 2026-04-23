@@ -11,7 +11,6 @@ import { LoginPage } from '../pages/LoginPage.jsx';
 import { MatchesPage } from '../pages/MatchesPage.jsx';
 import { NotFoundPage } from '../pages/NotFoundPage.jsx';
 import { PaymentsPage } from '../pages/PaymentsPage.jsx';
-import { ResultsPage } from '../pages/ResultsPage.jsx';
 import { PlayoffPage } from '../pages/PlayoffPage.jsx';
 import { ProfilePage } from '../pages/ProfilePage.jsx';
 import { RegisterPage } from '../pages/RegisterPage.jsx';
@@ -40,7 +39,6 @@ const routes = [
   { path: '/tournaments/:id/checkin', component: CheckinPage, layout: 'app', access: 'private' },
   { path: '/tournaments/:id/matches', component: MatchesPage, layout: 'app', access: 'private' },
   { path: '/tournaments/:id/schedule', component: SchedulePage, layout: 'app', access: 'private' },
-  { path: '/tournaments/:id/results', component: ResultsPage, layout: 'app', access: 'private' },
   { path: '/tournaments/:id/board', component: BoardPage, layout: 'app', access: 'private' },
   { path: '/tournaments/:id/admin', component: AdminPage, layout: 'app', access: 'private' },
 ];

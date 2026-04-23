@@ -106,8 +106,8 @@ export function CheckinPage({ params }) {
     <div className="stack-xl">
       <BackLink to={`/tournaments/${id}`}>Vissza a versenyhez</BackLink>
       <PageHeader
-        eyebrow="Jelenlét"
-        title="Jelenlét és sorsolás-előkészítés"
+        eyebrow="Check-in"
+        title="Jelenlét és sorsolás előkészítése"
         description="A verseny napján ez az egyik fő operatív oldal: itt dől el, hogy kik a tényleges indulók, és innen indítható a sorsolás lezárása is."
       />
 
@@ -115,7 +115,7 @@ export function CheckinPage({ params }) {
 
       <div className="page-grid">
         <div className="page-grid__main stack-lg">
-          <SectionCard title="Szűrés és gyors műveletek" subtitle="A jelenléti oldalon fontos, hogy tömegesen és gyorsan kezelhető legyen a részvétel.">
+          <SectionCard title="Szűrés és gyors műveletek" subtitle="A check-in oldalon fontos, hogy tömegesen és gyorsan kezelhető legyen a jelenlét.">
             <div className="form-grid form-grid--three">
               <FormField label="Kategória" htmlFor="checkin-category-filter">
                 <select id="checkin-category-filter" value={filters.categoryId} onChange={(e) => setFilters((state) => ({ ...state, categoryId: e.target.value }))}>
@@ -126,7 +126,7 @@ export function CheckinPage({ params }) {
               <FormField label="Állapot" htmlFor="checkin-attendance-filter">
                 <select id="checkin-attendance-filter" value={filters.attendance} onChange={(e) => setFilters((state) => ({ ...state, attendance: e.target.value }))}>
                   <option value="all">Összes</option>
-                  <option value="checkedin">Csak jelenléttel jelöltek</option>
+                  <option value="checkedin">Csak check-inelt</option>
                   <option value="missing">Csak hiányzók</option>
                 </select>
               </FormField>
@@ -135,8 +135,8 @@ export function CheckinPage({ params }) {
               </FormField>
             </div>
             <div className="actions-row">
-              <button className="button button--secondary" type="button" onClick={() => bulkSetVisible(true)} disabled={filteredPlayers.length === 0}>Láthatók jelenlétre jelölése</button>
-              <button className="button button--ghost" type="button" onClick={() => bulkSetVisible(false)} disabled={filteredPlayers.length === 0}>Láthatók jelenlétének visszavonása</button>
+              <button className="button button--secondary" type="button" onClick={() => bulkSetVisible(true)} disabled={filteredPlayers.length === 0}>Láthatóak check-inelése</button>
+              <button className="button button--ghost" type="button" onClick={() => bulkSetVisible(false)} disabled={filteredPlayers.length === 0}>Láthatóak visszaállítása</button>
             </div>
           </SectionCard>
 
@@ -162,13 +162,13 @@ export function CheckinPage({ params }) {
                       <td>{player.club || '—'}</td>
                       <td>
                         <StatusBadge tone={player.checkedInAt ? 'success' : 'warning'}>
-                          {player.checkedInAt ? 'jelen van' : 'nincs jelenléttel jelölve'}
+                          {player.checkedInAt ? 'jelen van' : 'nincs check-in'}
                         </StatusBadge>
                       </td>
                       <td>{player.note || '—'}</td>
                       <td>
                         <button className="button button--ghost" type="button" onClick={() => toggleCheckin(player, !player.checkedInAt)}>
-                          {player.checkedInAt ? 'Jelenlét visszavonása' : 'Jelenlét jelölése'}
+                          {player.checkedInAt ? 'Check-out' : 'Check-in'}
                         </button>
                       </td>
                     </tr>
@@ -183,10 +183,10 @@ export function CheckinPage({ params }) {
         </div>
 
         <aside className="page-grid__side aside-stack">
-          <SectionCard title="Jelenléti összesítő" subtitle={tournament?.name ?? 'Verseny összesítés'}>
+          <SectionCard title="Check-in összesítő" subtitle={tournament?.name ?? 'Verseny összesítés'}>
             <div className="key-value-list">
               <div className="key-value-list__row"><span className="key-value-list__label">Összes játékos</span><span className="key-value-list__value">{summary.total}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Jelenléttel jelölve</span><span className="key-value-list__value">{summary.checkedIn}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Check-inelve</span><span className="key-value-list__value">{summary.checkedIn}</span></div>
               <div className="key-value-list__row"><span className="key-value-list__label">Hiányzók</span><span className="key-value-list__value">{summary.missing}</span></div>
             </div>
           </SectionCard>
@@ -200,7 +200,7 @@ export function CheckinPage({ params }) {
                     <StatusBadge tone={toneForStatus(category.status)}>{formatStatusLabel(category.status)}</StatusBadge>
                   </div>
                   <div className="summary-item__meta">
-                    <span>{groupCountByCategory[String(category._id)] ?? 0} csoport</span>
+                    <span>{groupCountByCategory[String(category._id)] ?? 0} group</span>
                     <AppLink className="text-link" to={`/tournaments/${id}/categories/${category._id}`}>Megnyitás</AppLink>
                   </div>
                   <div className="inline-actions">
@@ -208,7 +208,7 @@ export function CheckinPage({ params }) {
                       Sorsolás lezárása
                     </button>
                     <button className="button button--ghost" type="button" disabled={busyCategoryId === category._id || !['draw_locked', 'in_progress'].includes(category.status)} onClick={() => categoryAction(category._id, 'close-grace', { force: true })}>
-                      Türelmi idő lezárása
+                      Grace lezárása
                     </button>
                   </div>
                 </div>

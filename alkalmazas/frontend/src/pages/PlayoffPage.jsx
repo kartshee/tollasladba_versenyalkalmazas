@@ -170,9 +170,9 @@ export function PlayoffPage({ params }) {
     <div className="stack-xl">
       <BackLink to={`/tournaments/${id}/categories/${categoryId}`}>Vissza a kategóriához</BackLink>
       <PageHeader
-        eyebrow="Rájátszás"
-        title="Rájátszás és bronzmeccs"
-        description="A rájátszás nézet a kategória teljes kieséses ágát mutatja. Innen generálható és továbbvihető az ágfa, valamint gyorsan ellenőrizhető a döntő és a bronzmeccs állapota."
+        eyebrow="Playoff"
+        title="Playoff és bronzmeccs"
+        description="A playoff nézet a kategória teljes kieséses ágát mutatja. Innen generálható és továbbvihető az ágrajz, valamint gyorsan ellenőrizhető a döntő és a bronzmeccs állapota."
         action={category ? <StatusBadge tone={toneForStatus(category.status)}>{formatStatusLabel(category.status)}</StatusBadge> : null}
       />
 
@@ -180,12 +180,12 @@ export function PlayoffPage({ params }) {
 
       <div className="page-grid">
         <div className="page-grid__main stack-lg">
-          {loading ? <SectionCard title="Betöltés"><div className="muted">Rájátszás adatok betöltése...</div></SectionCard> : null}
+          {loading ? <SectionCard title="Betöltés"><div className="muted">Playoff adatok betöltése...</div></SectionCard> : null}
 
           {!loading && category?.format === 'playoff' ? (
-            <SectionCard title="Csak egyenes kieséses kategória" subtitle="Az ágfa eleve csoportkör nélkül indul.">
+            <SectionCard title="Playoff-only kategória" subtitle="Az ágrajz csoportkör nélkül indul.">
               {playoffOnlyMatches.length === 0 ? (
-                <div className="muted">Ehhez a kategóriához még nincs generált rájátszás.</div>
+                <div className="muted">Ehhez a kategóriához még nincs sorsolás.</div>
               ) : (
                 <div className="bracket-grid">
                   {playoffMatchRows(playoffOnlyMatches).map((section) => (
@@ -211,11 +211,11 @@ export function PlayoffPage({ params }) {
             const playoff = playoffByGroup[group._id] ?? { matches: [], rounds: {} };
             const rows = playoffMatchRows(playoff.matches ?? []);
             return (
-              <SectionCard key={group._id} title={group.name} subtitle="A csoportból induló rájátszás állapota.">
+              <SectionCard key={group._id} title={group.name} subtitle="A csoportból induló playoff ág állapota.">
                 {rows.length === 0 ? (
                   <div className="empty-state">
-                    <h3>Még nincs rájátszás generálva</h3>
-                    <p>Ha a csoportkör kész és a továbbjutók eldőltek, innen létrehozható a rájátszás.</p>
+                    <h3>Még nincs playoff generálva</h3>
+                    <p>Ha a csoportkör kész és a továbbjutók eldőltek, innen létrehozható a playoff ág.</p>
                     <div className="actions-row">
                       <button className="button button--primary" type="button" disabled={busyKey === `generate-${group._id}`} onClick={() => generateGroupPlayoff(group._id)}>
                         Playoff generálása
@@ -248,18 +248,18 @@ export function PlayoffPage({ params }) {
         </div>
 
         <aside className="page-grid__side aside-stack">
-          <SectionCard title="Rájátszás összesítő" subtitle={category?.name ?? 'Kategória'}>
+          <SectionCard title="Playoff összesítő" subtitle={category?.name ?? 'Kategória'}>
             <div className="key-value-list">
-              <div className="key-value-list__row"><span className="key-value-list__label">Összes rájátszás meccs</span><span className="key-value-list__value">{summary.total}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Várakozik</span><span className="key-value-list__value">{summary.pending}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Folyamatban</span><span className="key-value-list__value">{summary.running}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Lezárt</span><span className="key-value-list__value">{summary.finished}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Összes playoff meccs</span><span className="key-value-list__value">{summary.total}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Várakozó</span><span className="key-value-list__value">{summary.pending}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Fut</span><span className="key-value-list__value">{summary.running}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Finished</span><span className="key-value-list__value">{summary.finished}</span></div>
             </div>
           </SectionCard>
 
-          <SectionCard title="Kijelölt rájátszás meccs" subtitle="Gyors eredményrögzítés a rájátszás nézetből.">
+          <SectionCard title="Kijelölt playoff meccs" subtitle="Gyors eredményrögzítés a playoff nézetből.">
             {!selectedMatch ? (
-              <div className="muted">Válassz egy meccset az ágfából.</div>
+              <div className="muted">Válassz egy meccset az ágrajzból.</div>
             ) : (
               <form className="stack-md" onSubmit={saveSelectedResult}>
                 <div className="readonly-field">
@@ -268,8 +268,8 @@ export function PlayoffPage({ params }) {
                   <span className="readonly-field__help">{roundLabel(selectedMatch.round)} • {formatDateTime(selectedMatch.startAt)}</span>
                 </div>
                 <div className="inline-actions">
-                  <button className="button button--ghost" type="button" onClick={() => updateSelectedStatus('running')}>Folyamatban</button>
-                  <button className="button button--ghost" type="button" onClick={() => updateSelectedStatus('pending')}>Várakozik</button>
+                  <button className="button button--ghost" type="button" onClick={() => updateSelectedStatus('running')}>Fut</button>
+                  <button className="button button--ghost" type="button" onClick={() => updateSelectedStatus('pending')}>Várakozó</button>
                 </div>
                 {resultRows.map((row, index) => (
                   <div key={`playoff-set-${index}`} className="score-row">

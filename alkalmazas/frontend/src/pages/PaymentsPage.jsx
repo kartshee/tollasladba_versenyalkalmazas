@@ -7,6 +7,7 @@ import { StatCard } from '../components/StatCard.jsx';
 import { EmptyState } from '../components/EmptyState.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
+import { formatCurrency } from '../services/formatters.jsx';
 
 const emptyForm = {
   payerName: '',
@@ -17,7 +18,7 @@ const emptyForm = {
   entryIds: [],
 };
 
-function PaymentGroupRow({ group, onSelect, selected }) {
+function PaymentGroupRow({ group, onSelect, onMarkPaid, selected }) {
   return (
     <tr className={selected ? 'data-table__row--active' : ''}>
       <td>
@@ -26,17 +27,27 @@ function PaymentGroupRow({ group, onSelect, selected }) {
         </button>
       </td>
       <td>{group.billingName || '—'}</td>
-      <td>{group.entriesCount ?? 0} nevezés</td>
+      <td>
+        {group.paidEntriesCount ?? 0} / {group.entriesCount ?? 0}
+      </td>
+      <td>{formatCurrency(group.totalAmount ?? 0)}</td>
       <td>
         <StatusBadge tone={group.paid ? 'success' : 'warning'}>
-          {group.paid ? 'Befizetve' : 'Nem fizette be'}
+          {group.paid ? 'Befizetve' : 'Nincs rendezve'}
         </StatusBadge>
       </td>
       <td>{group.note || '—'}</td>
       <td>
-        <button className="button button--ghost" type="button" onClick={() => onSelect(group)}>
-          Szerkesztés
-        </button>
+        <div className="inline-actions">
+          <button className="button button--ghost" type="button" onClick={() => onSelect(group)}>
+            Szerkesztés
+          </button>
+          {!group.paid ? (
+            <button className="button button--secondary" type="button" onClick={() => onMarkPaid(group)}>
+              Csoport befizetése
+            </button>
+          ) : null}
+        </div>
       </td>
     </tr>
   );
@@ -52,7 +63,6 @@ export function PaymentsPage({ params }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // Selected group for editing
   const [editingGroup, setEditingGroup] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -82,7 +92,6 @@ export function PaymentsPage({ params }) {
     [categories],
   );
 
-  // Entries not yet in a payment group
   const ungroupedEntries = useMemo(
     () => entries.filter((e) => !e.paymentGroupId),
     [entries],
@@ -94,6 +103,7 @@ export function PaymentsPage({ params }) {
     unpaid: groups.filter((g) => !g.paid).length,
     totalEntries: entries.length,
     paidEntries: entries.filter((e) => e.paid).length,
+    groupedEntries: entries.filter((e) => e.paymentGroupId).length,
   }), [groups, entries]);
 
   function openNew() {
@@ -104,7 +114,6 @@ export function PaymentsPage({ params }) {
 
   function openEdit(group) {
     setEditingGroup(group);
-    // Find which entries belong to this group
     const groupEntryIds = entries
       .filter((e) => String(e.paymentGroupId) === String(group._id))
       .map((e) => String(e._id));
@@ -169,12 +178,38 @@ export function PaymentsPage({ params }) {
     }
   }
 
-  // The entries that can be shown in form (current group's entries + ungrouped)
+  async function markGroupPaid(group) {
+    setBusy(true);
+    setError('');
+    try {
+      await api.patch(`/api/payment-groups/${group._id}`, { paid: true }, { token: auth.token });
+      await loadAll();
+      if (editingGroup && String(editingGroup._id) === String(group._id)) {
+        setForm((current) => ({ ...current, paid: true }));
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const selectableEntries = useMemo(() => {
     if (!editingGroup) return ungroupedEntries;
     const groupEntryIds = new Set(form.entryIds);
     return entries.filter((e) => !e.paymentGroupId || groupEntryIds.has(String(e._id)));
   }, [editingGroup, entries, ungroupedEntries, form.entryIds]);
+
+  const selectedEntries = useMemo(() => {
+    const selectedIds = new Set(form.entryIds.map(String));
+    return entries.filter((entry) => selectedIds.has(String(entry._id)));
+  }, [entries, form.entryIds]);
+
+  const selectedTotals = useMemo(() => ({
+    count: selectedEntries.length,
+    amount: selectedEntries.reduce((sum, entry) => sum + Number(entry.feeAmount ?? 0), 0),
+    paid: selectedEntries.filter((entry) => entry.paid).length,
+  }), [selectedEntries]);
 
   return (
     <div className="stack-xl">
@@ -182,7 +217,7 @@ export function PaymentsPage({ params }) {
       <PageHeader
         eyebrow="Fizetési csoportok"
         title="Nevezési díj kezelés"
-        description="A csoportos befizetések adminisztrációja. Egy fizetési csoport több nevezést fog össze, és jelzi, hogy ki és mikor egyenlítette ki a díjat."
+        description="A csoportos befizetések adminisztrációja. Egy fizetési csoport több nevezést fog össze, és egy kattintással rendezhető a teljes csoport befizetése."
         action={
           <button className="button button--primary" type="button" onClick={openNew}>
             Új fizetési csoport
@@ -194,9 +229,9 @@ export function PaymentsPage({ params }) {
 
       <div className="stats-grid">
         <StatCard label="Fizetési csoportok" value={summary.total} />
-        <StatCard label="Befizetve" value={summary.paid} />
-        <StatCard label="Még nem fizette" value={summary.unpaid} />
-        <StatCard label="Csoportosítatlan nevezések" value={ungroupedEntries.length} />
+        <StatCard label="Befizetett csoportok" value={summary.paid} />
+        <StatCard label="Hátralékos csoportok" value={summary.unpaid} />
+        <StatCard label="Csoportba sorolt nevezések" value={summary.groupedEntries} />
       </div>
 
       <div className="page-grid">
@@ -217,15 +252,34 @@ export function PaymentsPage({ params }) {
                   <FormField label="Számlázási cím" htmlFor="billingAddress">
                     <input id="billingAddress" value={form.billingAddress} onChange={(e) => update('billingAddress', e.target.value)} placeholder="Például: 6000 Kecskemét, Sport u. 1." />
                   </FormField>
-                  <FormField label="Státusz" htmlFor="paid">
+                  <FormField
+                    label="Státusz"
+                    htmlFor="paid"
+                    hintText="Ha a csoportot befizetettre állítod és elmented, a rendszer az összes hozzárendelt nevezést is befizetettre állítja."
+                  >
                     <select id="paid" value={String(form.paid)} onChange={(e) => update('paid', e.target.value === 'true')}>
-                      <option value="false">Nem fizette be</option>
+                      <option value="false">Nincs rendezve</option>
                       <option value="true">Befizetve</option>
                     </select>
                   </FormField>
                   <FormField label="Megjegyzés" htmlFor="note">
                     <input id="note" value={form.note} onChange={(e) => update('note', e.target.value)} placeholder="Opcionális megjegyzés" />
                   </FormField>
+                </div>
+
+                <div className="summary-grid summary-grid--compact">
+                  <div className="summary-item">
+                    <span className="summary-item__label">Kiválasztott nevezések</span>
+                    <strong>{selectedTotals.count}</strong>
+                  </div>
+                  <div className="summary-item">
+                    <span className="summary-item__label">Összes díj</span>
+                    <strong>{formatCurrency(selectedTotals.amount)}</strong>
+                  </div>
+                  <div className="summary-item">
+                    <span className="summary-item__label">Már befizetett</span>
+                    <strong>{selectedTotals.paid}</strong>
+                  </div>
                 </div>
 
                 <div>
@@ -240,6 +294,7 @@ export function PaymentsPage({ params }) {
                           <th>Kiválasztva</th>
                           <th>Játékos neve</th>
                           <th>Kategória</th>
+                          <th>Díj</th>
                           <th>Befizetve?</th>
                         </tr>
                       </thead>
@@ -256,6 +311,7 @@ export function PaymentsPage({ params }) {
                             </td>
                             <td>{entry.playerId?.name ?? entry.playerId ?? '—'}</td>
                             <td>{categoryMap.get(String(entry.categoryId?._id ?? entry.categoryId)) ?? '—'}</td>
+                            <td>{formatCurrency(entry.feeAmount)}</td>
                             <td>
                               <StatusBadge tone={entry.paid ? 'success' : 'warning'}>
                                 {entry.paid ? 'igen' : 'nem'}
@@ -269,6 +325,11 @@ export function PaymentsPage({ params }) {
                 </div>
 
                 <div className="actions-row">
+                  {!form.paid && form.entryIds.length > 0 ? (
+                    <button className="button button--secondary" type="button" onClick={() => update('paid', true)}>
+                      Csoport jelölése befizetettre
+                    </button>
+                  ) : null}
                   <button className="button button--primary" type="submit" disabled={busy}>
                     {busy ? 'Mentés...' : editingGroup ? 'Módosítás mentése' : 'Csoport létrehozása'}
                   </button>
@@ -293,7 +354,8 @@ export function PaymentsPage({ params }) {
                   <tr>
                     <th>Fizető neve</th>
                     <th>Számlázási név</th>
-                    <th>Nevezések</th>
+                    <th>Befizetett / összes</th>
+                    <th>Összeg</th>
                     <th>Státusz</th>
                     <th>Megjegyzés</th>
                     <th>Művelet</th>
@@ -305,6 +367,7 @@ export function PaymentsPage({ params }) {
                       key={group._id}
                       group={group}
                       onSelect={openEdit}
+                      onMarkPaid={markGroupPaid}
                       selected={editingGroup && String(editingGroup._id) === String(group._id)}
                     />
                   ))}
@@ -322,16 +385,20 @@ export function PaymentsPage({ params }) {
                 <span className="key-value-list__value">{summary.total}</span>
               </div>
               <div className="key-value-list__row">
-                <span className="key-value-list__label">Befizetve</span>
+                <span className="key-value-list__label">Befizetett csoportok</span>
                 <span className="key-value-list__value">{summary.paid}</span>
               </div>
               <div className="key-value-list__row">
-                <span className="key-value-list__label">Hátralékos</span>
+                <span className="key-value-list__label">Hátralékos csoportok</span>
                 <span className="key-value-list__value">{summary.unpaid}</span>
               </div>
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Csoportosítatlan nevezések</span>
                 <span className="key-value-list__value">{ungroupedEntries.length}</span>
+              </div>
+              <div className="key-value-list__row">
+                <span className="key-value-list__label">Befizetett nevezések</span>
+                <span className="key-value-list__value">{summary.paidEntries} / {summary.totalEntries}</span>
               </div>
             </div>
           </SectionCard>
@@ -339,6 +406,7 @@ export function PaymentsPage({ params }) {
           <SectionCard title="Hogyan működik?" subtitle="A fizetési csoport célja.">
             <ul className="bullet-list">
               <li>Egy csoport több nevezést fog össze egyetlen fizető alá.</li>
+              <li>Ha a csoport státuszát befizetettre állítod, a rendszer az összes hozzárendelt nevezést is befizetettre állítja.</li>
               <li>Tipikusan akkor hasznos, ha egy egyesület egyszerre fizeti be több játékos nevezési díját.</li>
               <li>A rendszer nem kezel tényleges banki tranzakciót – ez kizárólag adminisztratív nyilvántartás.</li>
             </ul>

@@ -30,13 +30,14 @@ function getContext(pathname) {
   if (!isObjectIdLike(tournamentId)) return null;
 
   const ci = parts.indexOf('categories');
-  const rawCategoryId = ci !== -1 && parts[ci + 1] && parts[ci + 1] !== 'new' ? parts[ci + 1] : null;
+  const rawCategoryId =
+    ci !== -1 && parts[ci + 1] && parts[ci + 1] !== 'new' ? parts[ci + 1] : null;
   const categoryId = rawCategoryId && isObjectIdLike(rawCategoryId) ? rawCategoryId : null;
 
   return { tournamentId, categoryId };
 }
 
-function userInitials(name) {
+function UserInitials(name) {
   if (!name) return '?';
   const parts = name.trim().split(' ');
   if (parts.length === 1) return parts[0][0].toUpperCase();
@@ -52,6 +53,7 @@ export function AppLayout({ children }) {
   return (
     <div className="app-shell">
       <aside className="sidebar">
+        {/* Brand */}
         <div className="sidebar__brand">
           <div className="brand-mark brand-mark--small">TVR</div>
           <div>
@@ -61,14 +63,16 @@ export function AppLayout({ children }) {
         </div>
 
         <div className="sidebar__body">
+          {/* Főmenü */}
           <div className="sidebar__section">
             <div className="sidebar__section-title">Főmenü</div>
             <nav className="sidebar__nav">
-              <NavLink to="/" label="Főoldal" icon="⊞" />
+              <NavLink to="/" label="Dashboard" icon="⊞" />
               <NavLink to="/tournaments/new" label="Új verseny" icon="+" />
             </nav>
           </div>
 
+          {/* Aktuális verseny */}
           {ctx ? (
             <>
               <div className="sidebar__divider" />
@@ -79,24 +83,37 @@ export function AppLayout({ children }) {
                   <NavLink to={`/tournaments/${ctx.tournamentId}/categories`} label="Kategóriák" icon="⊟" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/entries`} label="Nevezések" icon="☰" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/payments`} label="Befizetések" icon="$" />
-                  <NavLink to={`/tournaments/${ctx.tournamentId}/checkin`} label="Jelenlét" icon="✓" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}/checkin`} label="Check-in" icon="✓" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/matches`} label="Meccsek" icon="⚡" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/schedule`} label="Ütemezés" icon="◷" />
-                  <NavLink to={`/tournaments/${ctx.tournamentId}/results`} label="Eredmények" icon="🏆" />
-                  <NavLink to={`/tournaments/${ctx.tournamentId}/board`} label="Kijelző" icon="▣" />
-                  <NavLink to={`/tournaments/${ctx.tournamentId}/admin`} label="Export / napló" icon="↓" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}/board`} label="Board" icon="▣" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}/admin`} label="Export / Napló" icon="↓" />
                 </nav>
               </div>
 
+              {/* Kategória szint */}
               {ctx.categoryId ? (
                 <>
                   <div className="sidebar__divider" />
                   <div className="sidebar__section">
                     <div className="sidebar__section-title">Kategória</div>
                     <nav className="sidebar__nav">
-                      <NavLink to={`/tournaments/${ctx.tournamentId}/categories/${ctx.categoryId}`} label="Műveletek" icon="◇" exact />
-                      <NavLink to={`/tournaments/${ctx.tournamentId}/categories/${ctx.categoryId}/standings`} label="Tabella" icon="≡" />
-                      <NavLink to={`/tournaments/${ctx.tournamentId}/categories/${ctx.categoryId}/playoff`} label="Rájátszás" icon="⊳" />
+                      <NavLink
+                        to={`/tournaments/${ctx.tournamentId}/categories/${ctx.categoryId}`}
+                        label="Műveletek"
+                        icon="◇"
+                        exact
+                      />
+                      <NavLink
+                        to={`/tournaments/${ctx.tournamentId}/categories/${ctx.categoryId}/standings`}
+                        label="Standings"
+                        icon="≡"
+                      />
+                      <NavLink
+                        to={`/tournaments/${ctx.tournamentId}/categories/${ctx.categoryId}/playoff`}
+                        label="Playoff"
+                        icon="⊳"
+                      />
                     </nav>
                   </div>
                 </>
@@ -105,18 +122,23 @@ export function AppLayout({ children }) {
           ) : null}
         </div>
 
+        {/* Footer / User */}
         <div className="sidebar__footer">
           <AppLink className="sidebar__profile-link" to="/profile">
-            <div className="sidebar__user-card">
-              <div className="sidebar__user-avatar">{userInitials(name)}</div>
-              <div style={{ minWidth: 0 }}>
-                <div className="sidebar__user-name">{name || 'Felhasználó'}</div>
-                <div className="sidebar__user-email">{auth.user?.email ?? ''}</div>
-                <div className="sidebar__user-hint">Profil szerkesztése →</div>
-              </div>
+          <div className="sidebar__user-card">
+            <div className="sidebar__user-avatar">{UserInitials(name)}</div>
+            <div style={{ minWidth: 0 }}>
+              <div className="sidebar__user-name">{name || 'Felhasználó'}</div>
+              <div className="sidebar__user-email">{auth.user?.email ?? ''}</div>
+              <div className="sidebar__user-hint">Profil szerkesztése →</div>
             </div>
+          </div>
           </AppLink>
-          <button className="button button--danger-soft button--block button--sm" type="button" onClick={auth.logout}>
+          <button
+            className="button button--danger-soft button--block button--sm"
+            type="button"
+            onClick={auth.logout}
+          >
             Kijelentkezés
           </button>
         </div>
@@ -129,7 +151,7 @@ export function AppLayout({ children }) {
             {ctx ? (
               <>
                 <span className="topbar__sep">/</span>
-                <span className="topbar__badge">Aktuális verseny</span>
+                <span className="topbar__badge">Verseny aktív</span>
               </>
             ) : null}
           </div>

@@ -209,7 +209,7 @@ export function EntriesPage({ params }) {
                   <FormField label="Klub" htmlFor="entry-club">
                     <input id="entry-club" value={quickAdd.club} onChange={(e) => setQuickAdd((state) => ({ ...state, club: e.target.value }))} />
                   </FormField>
-                  <FormField label="Kategória" htmlFor="entry-category" hintText="A játékos létrehozásakor rögtön hozzárendelhető egy kategóriához. Ha a kategória sorsolása már lezárt, a játékos később csak barátságos meccsre vehető fel.">
+                  <FormField label="Kategória" htmlFor="entry-category" hintText="A játékos létrehozásakor rögtön hozzárendelhető egy kategóriához. Ha a kategória már lezárt sorsolás állapotban van, a játékos később csak friendly státuszban kerülhet be.">
                     <select id="entry-category" value={quickAdd.categoryId} onChange={(e) => setQuickAdd((state) => ({ ...state, categoryId: e.target.value }))} required>
                       <option value="">Kategória kiválasztása</option>
                       {categories.map((category) => <option key={category._id} value={category._id}>{category.name}</option>)}
@@ -254,7 +254,7 @@ export function EntriesPage({ params }) {
                   <th>Klub</th>
                   <th>Fizetett</th>
                   <th>Összeg</th>
-                  <th>Fizetési csoport</th>
+                  <th>Payment group</th>
                   <th>Művelet</th>
                 </tr>
               </thead>
@@ -325,7 +325,7 @@ export function EntriesPage({ params }) {
                 <FormField label="Díjösszeg" htmlFor="entry-fee-amount">
                   <input id="entry-fee-amount" type="number" min="0" step="100" value={entryForm.feeAmount} onChange={(e) => setEntryForm((state) => ({ ...state, feeAmount: e.target.value }))} />
                 </FormField>
-                <FormField label="Fizetési csoport" htmlFor="entry-payment-group" hintText="Ha egy klub vagy csapat egyben fizeti a nevezéseket, itt rendelhető a nevezés egy közös fizetési csoporthoz.">
+                <FormField label="Payment group" htmlFor="entry-payment-group" hintText="Ha egy klub vagy csapat egyben fizeti a nevezéseket, itt rendelhető a nevezés egy közös fizetési csoporthoz.">
                   <select id="entry-payment-group" value={entryForm.paymentGroupId} onChange={(e) => setEntryForm((state) => ({ ...state, paymentGroupId: e.target.value }))}>
                     <option value="">Nincs hozzárendelve</option>
                     {paymentGroups.map((group) => <option key={group._id} value={group._id}>{group.payerName}</option>)}
@@ -348,7 +348,7 @@ export function EntriesPage({ params }) {
             )}
           </SectionCard>
 
-          <SectionCard title="Új fizetési csoport" subtitle="Csoportos befizetések adminisztratív kezelése.">
+          <SectionCard title="Új payment group" subtitle="Csoportos befizetések adminisztratív kezelése.">
             <form className="stack-md" onSubmit={handleCreatePaymentGroup}>
               <FormField label="Fizető neve" htmlFor="payment-payer-name">
                 <input id="payment-payer-name" value={paymentForm.payerName} onChange={(e) => setPaymentForm((state) => ({ ...state, payerName: e.target.value }))} required />
@@ -359,14 +359,14 @@ export function EntriesPage({ params }) {
               <FormField label="Számlázási cím" htmlFor="payment-billing-address">
                 <textarea id="payment-billing-address" rows="2" value={paymentForm.billingAddress} onChange={(e) => setPaymentForm((state) => ({ ...state, billingAddress: e.target.value }))} />
               </FormField>
-              <FormField label="Nevezés ID-k (soronként)" htmlFor="payment-entry-ids" hintText="Opcionális. Ha megadod, a felsorolt nevezések automatikusan ehhez a fizetési csoporthoz lesznek rendelve.">
+              <FormField label="Nevezés ID-k (soronként)" htmlFor="payment-entry-ids" hintText="Opcionális. Ha megadod, a felsorolt nevezések automatikusan ehhez a payment grouphoz lesznek rendelve.">
                 <textarea id="payment-entry-ids" rows="3" value={paymentForm.entryIdsText} onChange={(e) => setPaymentForm((state) => ({ ...state, entryIdsText: e.target.value }))} placeholder="6612...\n6613..." />
               </FormField>
               <label className="checkbox-row">
                 <input type="checkbox" checked={paymentForm.paid} onChange={(e) => setPaymentForm((state) => ({ ...state, paid: e.target.checked }))} />
                 <span>Fizetve</span>
               </label>
-              <button className="button button--secondary button--block" type="submit" disabled={submitting}>Fizetési csoport létrehozása</button>
+              <button className="button button--secondary button--block" type="submit" disabled={submitting}>Payment group létrehozása</button>
             </form>
           </SectionCard>
         </aside>

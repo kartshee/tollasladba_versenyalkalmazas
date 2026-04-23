@@ -44,7 +44,7 @@ export function DashboardPage() {
   return (
     <div className="stack-xl">
       <PageHeader
-        eyebrow="Főoldal"
+        eyebrow="Dashboard"
         title="Saját versenyek"
         description="A főoldalról gyorsan áttekinthető, melyik verseny milyen állapotban van, és innen érhető el minden fontos adminisztrációs folyamat."
         action={<AppLink className="button button--primary" to="/tournaments/new">Új verseny</AppLink>}
@@ -120,7 +120,7 @@ export function DashboardPage() {
             </div>
           </SectionCard>
 
-          <SectionCard title="Használati elv" subtitle="A főoldal célja a gyors eligazodás, nem a túlterhelt grafikai megjelenítés.">
+          <SectionCard title="Használati elv" subtitle="A dashboard célja a gyors eligazodás, nem a túlterhelt grafikai megjelenítés.">
             <ul className="bullet-list">
               <li>Minden fontos funkció 1-2 kattintásból elérhető legyen.</li>
               <li>A legfontosabb versenynapi műveletek külön oldalon jelenjenek meg.</li>

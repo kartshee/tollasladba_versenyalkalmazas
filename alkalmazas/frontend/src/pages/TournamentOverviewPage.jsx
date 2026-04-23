@@ -6,7 +6,6 @@ import { StatCard } from '../components/StatCard.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
-import { formatCategoryFormat, formatStatusLabel, formatTournamentStatus, toneForStatus } from '../services/formatters.jsx';
 
 export function TournamentOverviewPage({ params }) {
   const { id } = params;
@@ -47,18 +46,24 @@ export function TournamentOverviewPage({ params }) {
     }
   }
 
-  if (!tournament) return <div className="muted">{error || 'Betöltés...'}</div>;
+  if (!tournament) {
+    return <div className="muted">{error || 'Betöltés...'}</div>;
+  }
 
   const referees = tournament.referees?.map((r) => r.name).filter(Boolean) ?? [];
 
   return (
     <div className="stack-xl">
-      <BackLink to="/">Vissza a főoldalra</BackLink>
+      <BackLink to="/">Vissza a dashboardra</BackLink>
       <PageHeader
         eyebrow="Verseny áttekintése"
         title={tournament.name}
         description={tournament.location || 'A verseny központi adminisztrációs oldala, innen érhető el minden fő művelet.'}
-        action={<StatusBadge tone={toneForStatus(tournament.status)}>{formatTournamentStatus(tournament.status)}</StatusBadge>}
+        action={
+          <StatusBadge tone={tournament.status === 'running' ? 'success' : tournament.status === 'finished' ? 'warning' : 'neutral'}>
+            {tournament.status}
+          </StatusBadge>
+        }
       />
 
       {error ? <div className="alert alert--error">{error}</div> : null}
@@ -83,7 +88,7 @@ export function TournamentOverviewPage({ params }) {
                 <span>Játékosok, nevezések és nevezési díj státuszok kezelése.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/checkin`}>
-                <strong>Jelenlét</strong>
+                <strong>Check-in</strong>
                 <span>Jelenlétkezelés versenynapi használatra.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/matches`}>
@@ -92,14 +97,10 @@ export function TournamentOverviewPage({ params }) {
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/schedule`}>
                 <strong>Ütemezés</strong>
-                <span>Automatikus menetrend készítése a teljes versenyre.</span>
-              </AppLink>
-              <AppLink className="quick-link" to={`/tournaments/${id}/results`}>
-                <strong>Eredmények</strong>
-                <span>Végeredmény, dobogó és kategóriánkénti záró összesítő.</span>
+                <span>Globális ütemező és pályanézet.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/board`}>
-                <strong>Kijelző</strong>
+                <strong>Board</strong>
                 <span>Futó és következő meccsek kijelzős nézete.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/payments`}>
@@ -107,7 +108,7 @@ export function TournamentOverviewPage({ params }) {
                 <span>Fizetési csoportok és nevezési díj adminisztrációja.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/admin`}>
-                <strong>Export / napló</strong>
+                <strong>Export / Napló</strong>
                 <span>CSV letöltések és műveleti napló megtekintése.</span>
               </AppLink>
             </div>
@@ -130,8 +131,8 @@ export function TournamentOverviewPage({ params }) {
                   {categories.map((category) => (
                     <tr key={category._id}>
                       <td>{category.name}</td>
-                      <td>{formatCategoryFormat(category.format)}</td>
-                      <td><StatusBadge tone={toneForStatus(category.status)}>{formatStatusLabel(category.status)}</StatusBadge></td>
+                      <td>{category.format}</td>
+                      <td><StatusBadge>{category.status}</StatusBadge></td>
                       <td>
                         <AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${category._id}`}>
                           Megnyitás
@@ -148,10 +149,22 @@ export function TournamentOverviewPage({ params }) {
         <aside className="page-grid__side aside-stack">
           <SectionCard title="Verseny összesítő">
             <div className="key-value-list">
-              <div className="key-value-list__row"><span className="key-value-list__label">Helyszín</span><span className="key-value-list__value">{tournament.location || '—'}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Dátum</span><span className="key-value-list__value">{tournament.date ? new Date(tournament.date).toLocaleDateString('hu-HU') : '—'}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Állapot</span><span className="key-value-list__value">{formatTournamentStatus(tournament.status)}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Pályák</span><span className="key-value-list__value">{tournament.config?.courtsCount ?? 1}</span></div>
+              <div className="key-value-list__row">
+                <span className="key-value-list__label">Helyszín</span>
+                <span className="key-value-list__value">{tournament.location || '—'}</span>
+              </div>
+              <div className="key-value-list__row">
+                <span className="key-value-list__label">Dátum</span>
+                <span className="key-value-list__value">{tournament.date ? new Date(tournament.date).toLocaleDateString('hu-HU') : '—'}</span>
+              </div>
+              <div className="key-value-list__row">
+                <span className="key-value-list__label">Állapot</span>
+                <span className="key-value-list__value">{tournament.status}</span>
+              </div>
+              <div className="key-value-list__row">
+                <span className="key-value-list__label">Pályák</span>
+                <span className="key-value-list__value">{tournament.config?.courtsCount ?? 1}</span>
+              </div>
             </div>
           </SectionCard>
 

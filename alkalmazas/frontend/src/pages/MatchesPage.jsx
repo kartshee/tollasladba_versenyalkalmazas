@@ -5,7 +5,6 @@ import { SectionCard } from '../components/SectionCard.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
-import { AppLink } from '../components/AppLink.jsx';
 import { formatDateTime, formatStatusLabel, toneForStatus, roundLabel, setsToText, outcomeLabel, normalizeSearch } from '../services/formatters.jsx';
 
 const emptyResultRows = [
@@ -26,6 +25,96 @@ function normalizeResultRows(rows) {
     .map((row) => ({ p1: Number(row.p1), p2: Number(row.p2) }));
 }
 
+function safeText(value) {
+  return String(value ?? '').trim().toLocaleLowerCase('hu-HU');
+}
+
+function safeTime(value) {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY;
+}
+
+function defaultMatchCompare(a, b) {
+  const timeDiff = safeTime(a.startAt) - safeTime(b.startAt);
+  if (timeDiff !== 0) return timeDiff;
+
+  const courtA = Number.isFinite(Number(a.courtNumber)) ? Number(a.courtNumber) : Number.POSITIVE_INFINITY;
+  const courtB = Number.isFinite(Number(b.courtNumber)) ? Number(b.courtNumber) : Number.POSITIVE_INFINITY;
+  if (courtA !== courtB) return courtA - courtB;
+
+  return safeText(a.player1?.name ?? a.player1).localeCompare(safeText(b.player1?.name ?? b.player1), 'hu');
+}
+
+function sortMatches(matches, categoryMap, sort) {
+  const direction = sort.direction === 'desc' ? -1 : 1;
+
+  const sorted = [...matches].sort((a, b) => {
+    let result = 0;
+
+    switch (sort.key) {
+      case 'round':
+        result = safeText(roundLabel(a.round)).localeCompare(safeText(roundLabel(b.round)), 'hu');
+        break;
+      case 'players': {
+        const playersA = `${safeText(a.player1?.name ?? a.player1)} ${safeText(a.player2?.name ?? a.player2)}`;
+        const playersB = `${safeText(b.player1?.name ?? b.player1)} ${safeText(b.player2?.name ?? b.player2)}`;
+        result = playersA.localeCompare(playersB, 'hu');
+        break;
+      }
+      case 'category':
+        result = safeText(categoryMap.get(String(a.categoryId?._id ?? a.categoryId))).localeCompare(
+          safeText(categoryMap.get(String(b.categoryId?._id ?? b.categoryId))),
+          'hu',
+        );
+        break;
+      case 'status':
+        result = safeText(formatStatusLabel(a.status)).localeCompare(safeText(formatStatusLabel(b.status)), 'hu');
+        break;
+      case 'court': {
+        const courtA = Number.isFinite(Number(a.courtNumber)) ? Number(a.courtNumber) : Number.POSITIVE_INFINITY;
+        const courtB = Number.isFinite(Number(b.courtNumber)) ? Number(b.courtNumber) : Number.POSITIVE_INFINITY;
+        result = courtA - courtB;
+        break;
+      }
+      case 'time':
+        result = safeTime(a.startAt) - safeTime(b.startAt);
+        break;
+      case 'result': {
+        const resultA = `${safeText(a.winner?.name ?? a.winner)} ${safeText(outcomeLabel(a.resultType))} ${safeText(setsToText(a.sets))}`;
+        const resultB = `${safeText(b.winner?.name ?? b.winner)} ${safeText(outcomeLabel(b.resultType))} ${safeText(setsToText(b.sets))}`;
+        result = resultA.localeCompare(resultB, 'hu');
+        break;
+      }
+      default:
+        result = defaultMatchCompare(a, b);
+        break;
+    }
+
+    if (result !== 0) return result * direction;
+    return defaultMatchCompare(a, b);
+  });
+
+  return sorted;
+}
+
+function SortHeader({ label, sortKey, currentSort, onToggle }) {
+  const active = currentSort.key === sortKey;
+  const arrow = !active ? '↕' : currentSort.direction === 'asc' ? '↑' : '↓';
+
+  return (
+    <button
+      className="text-button"
+      type="button"
+      onClick={() => onToggle(sortKey)}
+      style={{ fontWeight: active ? 700 : 600 }}
+      title="Rendezés"
+    >
+      {label} {arrow}
+    </button>
+  );
+}
+
 export function MatchesPage({ params }) {
   const { id } = params;
   const auth = useAuth();
@@ -33,6 +122,7 @@ export function MatchesPage({ params }) {
   const [categories, setCategories] = useState([]);
   const [matches, setMatches] = useState([]);
   const [filters, setFilters] = useState({ categoryId: '', status: 'all', round: 'all', search: '' });
+  const [sort, setSort] = useState({ key: 'time', direction: 'asc' });
   const [selectedMatchId, setSelectedMatchId] = useState('');
   const [umpireName, setUmpireName] = useState('');
   const [resultRows, setResultRows] = useState(emptyResultRows);
@@ -82,9 +172,16 @@ export function MatchesPage({ params }) {
     });
   }, [matches, filters, categoryMap]);
 
+  const sortedMatches = useMemo(
+    () => sortMatches(filteredMatches, categoryMap, sort),
+    [filteredMatches, categoryMap, sort],
+  );
+
   const selectedMatch = useMemo(
-    () => filteredMatches.find((match) => String(match._id) === String(selectedMatchId)) ?? matches.find((match) => String(match._id) === String(selectedMatchId)) ?? null,
-    [filteredMatches, matches, selectedMatchId],
+    () => sortedMatches.find((match) => String(match._id) === String(selectedMatchId))
+      ?? matches.find((match) => String(match._id) === String(selectedMatchId))
+      ?? null,
+    [sortedMatches, matches, selectedMatchId],
   );
 
   useEffect(() => {
@@ -103,6 +200,15 @@ export function MatchesPage({ params }) {
     running: matches.filter((match) => match.status === 'running').length,
     finished: matches.filter((match) => match.status === 'finished').length,
   }), [matches]);
+
+  function toggleSort(nextKey) {
+    setSort((current) => {
+      if (current.key === nextKey) {
+        return { key: nextKey, direction: current.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key: nextKey, direction: nextKey === 'time' ? 'asc' : 'asc' };
+    });
+  }
 
   async function perform(action) {
     setBusy(true);
@@ -145,14 +251,14 @@ export function MatchesPage({ params }) {
       <PageHeader
         eyebrow="Meccsek"
         title="Operatív meccskezelés"
-        description="A teljes meccsállomány egy helyen látható. Innen kezelhető a státusz, a játékvezető, az eredmény és a speciális lezárás is."
+        description="A teljes meccsállomány egy helyen látható. Alapértelmezetten időrendben jelenik meg, de minden oszlop szerint rendezhető."
       />
 
       {error ? <div className="alert alert--error">{error}</div> : null}
 
       <div className="page-grid">
         <div className="page-grid__main stack-lg">
-          <SectionCard title="Szűrés" subtitle="Gyorsan leszűrhető a releváns meccshalmaz kategóriára, fordulóra vagy státuszra.">
+          <SectionCard title="Szűrés" subtitle="Gyorsan leszűrhető a releváns meccshalmaz kategóriára, körre vagy státuszra.">
             <div className="form-grid form-grid--four filters-grid">
               <FormField label="Kategória" htmlFor="matches-category-filter">
                 <select id="matches-category-filter" value={filters.categoryId} onChange={(e) => setFilters((state) => ({ ...state, categoryId: e.target.value }))}>
@@ -164,11 +270,11 @@ export function MatchesPage({ params }) {
                 <select id="matches-status-filter" value={filters.status} onChange={(e) => setFilters((state) => ({ ...state, status: e.target.value }))}>
                   <option value="all">Összes</option>
                   <option value="pending">Várakozik</option>
-                  <option value="running">Folyamatban</option>
-                  <option value="finished">Lezárt</option>
+                  <option value="running">Fut</option>
+                  <option value="finished">Befejezett</option>
                 </select>
               </FormField>
-              <FormField label="Forduló" htmlFor="matches-round-filter">
+              <FormField label="Kör" htmlFor="matches-round-filter">
                 <select id="matches-round-filter" value={filters.round} onChange={(e) => setFilters((state) => ({ ...state, round: e.target.value }))}>
                   <option value="all">Összes</option>
                   {roundOptions.map((round) => <option key={round} value={round}>{roundLabel(round)}</option>)}
@@ -180,22 +286,22 @@ export function MatchesPage({ params }) {
             </div>
           </SectionCard>
 
-          <SectionCard title="Meccslista" subtitle={loading ? 'Betöltés...' : `${filteredMatches.length} meccs a szűrés szerint`}>
+          <SectionCard title="Meccslista" subtitle={loading ? 'Betöltés...' : `${sortedMatches.length} meccs a szűrés szerint`}>
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Forduló</th>
-                  <th>Játékosok</th>
-                  <th>Kategória</th>
-                  <th>Státusz</th>
-                  <th>Pálya</th>
-                  <th>Időpont</th>
-                  <th>Eredmény</th>
+                  <th><SortHeader label="Kör" sortKey="round" currentSort={sort} onToggle={toggleSort} /></th>
+                  <th><SortHeader label="Játékosok" sortKey="players" currentSort={sort} onToggle={toggleSort} /></th>
+                  <th><SortHeader label="Kategória" sortKey="category" currentSort={sort} onToggle={toggleSort} /></th>
+                  <th><SortHeader label="Státusz" sortKey="status" currentSort={sort} onToggle={toggleSort} /></th>
+                  <th><SortHeader label="Pálya" sortKey="court" currentSort={sort} onToggle={toggleSort} /></th>
+                  <th><SortHeader label="Időpont" sortKey="time" currentSort={sort} onToggle={toggleSort} /></th>
+                  <th><SortHeader label="Eredmény" sortKey="result" currentSort={sort} onToggle={toggleSort} /></th>
                   <th>Művelet</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredMatches.map((match) => {
+                {sortedMatches.map((match) => {
                   const active = String(selectedMatchId) === String(match._id);
                   return (
                     <tr key={match._id} className={active ? 'data-table__row--active' : ''}>
@@ -214,7 +320,7 @@ export function MatchesPage({ params }) {
                     </tr>
                   );
                 })}
-                {!loading && filteredMatches.length === 0 ? (
+                {!loading && sortedMatches.length === 0 ? (
                   <tr><td colSpan="8" className="muted">Nincs a szűrésnek megfelelő meccs.</td></tr>
                 ) : null}
               </tbody>
@@ -226,9 +332,9 @@ export function MatchesPage({ params }) {
           <SectionCard title="Meccs összesítő">
             <div className="key-value-list">
               <div className="key-value-list__row"><span className="key-value-list__label">Összes meccs</span><span className="key-value-list__value">{summary.total}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Várakozik</span><span className="key-value-list__value">{summary.pending}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Folyamatban</span><span className="key-value-list__value">{summary.running}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Lezárt</span><span className="key-value-list__value">{summary.finished}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Várakozó</span><span className="key-value-list__value">{summary.pending}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Fut</span><span className="key-value-list__value">{summary.running}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Befejezett</span><span className="key-value-list__value">{summary.finished}</span></div>
             </div>
           </SectionCard>
 
@@ -244,8 +350,8 @@ export function MatchesPage({ params }) {
                 </div>
 
                 <div className="inline-actions">
-                  <button className="button button--ghost" type="button" disabled={busy || selectedMatch.status === 'pending'} onClick={() => updateStatus('pending')}>Várakozik</button>
-                  <button className="button button--secondary" type="button" disabled={busy || selectedMatch.status === 'running'} onClick={() => updateStatus('running')}>Folyamatban</button>
+                  <button className="button button--ghost" type="button" disabled={busy || selectedMatch.status === 'pending'} onClick={() => updateStatus('pending')}>Várakozó</button>
+                  <button className="button button--secondary" type="button" disabled={busy || selectedMatch.status === 'running'} onClick={() => updateStatus('running')}>Fut</button>
                 </div>
 
                 <FormField label="Játékvezető" htmlFor="match-umpire-name" hintText="A játékvezető a verseny globális erőforrása, de meccsszinten itt rendelhető hozzá.">
@@ -271,16 +377,16 @@ export function MatchesPage({ params }) {
                 <div className="stack-md">
                   <div className="section-card__title-row"><h3>Speciális lezárás</h3></div>
                   <div className="inline-actions">
-                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('wo', 'player1')}>WO – 1. játékos</button>
-                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('wo', 'player2')}>WO – 2. játékos</button>
+                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('wo', 'player1')}>W.O. játékos 1</button>
+                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('wo', 'player2')}>W.O. játékos 2</button>
                   </div>
                   <div className="inline-actions">
-                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ff', 'player1')}>FF – 1. játékos</button>
-                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ff', 'player2')}>FF – 2. játékos</button>
+                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ff', 'player1')}>Feladás játékos 1</button>
+                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ff', 'player2')}>Feladás játékos 2</button>
                   </div>
                   <div className="inline-actions">
-                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ret', 'player1')}>Sérülés – 1. játékos</button>
-                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ret', 'player2')}>Sérülés – 2. játékos</button>
+                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ret', 'player1')}>Visszalépés játékos 1</button>
+                    <button className="button button--ghost" type="button" disabled={busy} onClick={() => saveOutcome('ret', 'player2')}>Visszalépés játékos 2</button>
                   </div>
                 </div>
               </div>

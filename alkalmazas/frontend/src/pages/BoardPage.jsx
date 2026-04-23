@@ -29,7 +29,7 @@ function MatchCard({ match, variant = 'running' }) {
         <span className="board-card__category">{category}</span>
         {time ? <span className="board-card__time">{time}</span> : null}
         {variant === 'running'
-          ? <StatusBadge tone="success">Folyamatban</StatusBadge>
+          ? <StatusBadge tone="success">Fut</StatusBadge>
           : <StatusBadge tone="neutral">Következik</StatusBadge>}
       </div>
     </div>
@@ -75,7 +75,7 @@ export function BoardPage({ params }) {
     <div className="stack-xl">
       <BackLink to={`/tournaments/${id}`}>Vissza a versenyhez</BackLink>
       <PageHeader
-        eyebrow="Kijelző"
+        eyebrow="Board"
         title="Kijelzős nézet"
         description="A futó és a következőként betervezett meccsek gyors áttekintése. Az oldal 30 másodpercenként automatikusan frissül."
         action={

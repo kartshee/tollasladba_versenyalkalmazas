@@ -18,10 +18,39 @@ async function syncPaymentGroupEntries(group, entryIds = []) {
         throw new Error('One or more entryIds are invalid for this tournament');
     }
 
-    await Entry.updateMany({ paymentGroupId: group._id, _id: { $nin: uniqueIds } }, { $set: { paymentGroupId: null } });
+    await Entry.updateMany(
+        { paymentGroupId: group._id, _id: { $nin: uniqueIds } },
+        { $set: { paymentGroupId: null } }
+    );
+
     if (uniqueIds.length > 0) {
-        await Entry.updateMany({ _id: { $in: uniqueIds } }, { $set: { paymentGroupId: group._id } });
+        await Entry.updateMany(
+            { _id: { $in: uniqueIds } },
+            { $set: { paymentGroupId: group._id, paid: Boolean(group.paid) } }
+        );
     }
+}
+
+async function getPaymentGroupStats(groupIds = []) {
+    if (groupIds.length === 0) return new Map();
+
+    const stats = await Entry.aggregate([
+        { $match: { paymentGroupId: { $in: groupIds } } },
+        {
+            $group: {
+                _id: '$paymentGroupId',
+                entriesCount: { $sum: 1 },
+                paidEntriesCount: {
+                    $sum: {
+                        $cond: [{ $eq: ['$paid', true] }, 1, 0]
+                    }
+                },
+                totalAmount: { $sum: { $ifNull: ['$feeAmount', 0] } }
+            }
+        }
+    ]);
+
+    return new Map(stats.map((row) => [String(row._id), row]));
 }
 
 async function loadOwnedPaymentGroup(groupId, userId) {
@@ -50,15 +79,17 @@ router.get('/', async (req, res) => {
 
     const groups = await PaymentGroup.find(filter).sort({ createdAt: -1, _id: -1 }).lean();
     const ids = groups.map((g) => g._id);
-    const counts = ids.length > 0
-        ? await Entry.aggregate([
-            { $match: { paymentGroupId: { $in: ids } } },
-            { $group: { _id: '$paymentGroupId', count: { $sum: 1 } } }
-        ])
-        : [];
-    const countMap = new Map(counts.map((row) => [String(row._id), row.count]));
+    const statsMap = await getPaymentGroupStats(ids);
 
-    res.json(groups.map((g) => ({ ...g, entriesCount: countMap.get(String(g._id)) ?? 0 })));
+    res.json(groups.map((g) => {
+        const stats = statsMap.get(String(g._id));
+        return {
+            ...g,
+            entriesCount: stats?.entriesCount ?? 0,
+            paidEntriesCount: stats?.paidEntriesCount ?? 0,
+            totalAmount: stats?.totalAmount ?? 0
+        };
+    }));
 });
 
 router.post('/', async (req, res) => {
@@ -123,7 +154,12 @@ router.patch('/:id', async (req, res) => {
         if (note !== undefined) group.note = typeof note === 'string' ? note.trim() : '';
 
         await group.save();
-        if (entryIds !== undefined) await syncPaymentGroupEntries(group, Array.isArray(entryIds) ? entryIds : []);
+
+        if (entryIds !== undefined) {
+            await syncPaymentGroupEntries(group, Array.isArray(entryIds) ? entryIds : []);
+        } else {
+            await Entry.updateMany({ paymentGroupId: group._id }, { $set: { paid: Boolean(group.paid) } });
+        }
 
         await safeRecordAuditEvent({
             userId: req.user._id,
@@ -134,7 +170,7 @@ router.patch('/:id', async (req, res) => {
             summary: `Payment group updated: ${group.payerName}`,
             before,
             after: pickAuditFields(group, AUDIT_SNAPSHOT_FIELDS.paymentGroup),
-            metadata: { entryIds: Array.isArray(entryIds) ? entryIds : undefined }
+            metadata: { entryIds: Array.isArray(entryIds) ? entryIds : undefined, syncPaidToEntries: true }
         });
 
         const populated = await PaymentGroup.findById(group._id).lean();
