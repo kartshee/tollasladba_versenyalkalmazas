@@ -16,3 +16,12 @@ kérdések:
 5.hogy kell beadni, hogyan legyen futtatható? kell e hostolni vagy valami.
 
 6.kellene e screenshotok vagy ők fogjá e tesztelni vagy ilyenek.
+
+
+csoportot befizetni egyben
+
+
+fairness gap
+
+
+versenyek rendezése
