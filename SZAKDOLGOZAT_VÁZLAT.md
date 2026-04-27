@@ -1,3 +1,26 @@
+# 0. Formai és szerkezeti illesztési jegyzetek
+
+Ez a fájl a szakdolgozat **3–7. fejezetének munkavázlata**. A végleges beadandó dokumentumban a teljes dolgozatot az SZTE Informatikai Intézet formai követelményei szerint kell összeállítani. A hivatalos előírások alapján a végleges dokumentumnak kötelezően tartalmaznia kell a címoldalt, a feladatkiírást, a tartalmi összefoglalót, a tartalomjegyzéket, az érdemi részt, az irodalomjegyzéket és a nyilatkozatot; az alapszakos dolgozat ajánlott terjedelme mellékletek nélkül 25–50 oldal, a címsorok legnagyobb mélysége 3 lehet, a fő szöveg pedig Times New Roman betűtípussal, 12 pt méretben, 1,5 sortávolsággal és sorkizárt igazítással készítendő. Az ábrákat fejezetenként kell számozni, a szövegben minden ábrára hivatkozni kell, a hivatkozásokat pedig szögletes zárójelben sorszámozott irodalomjegyzékre kell visszavezetni.
+
+## 0.1 Beépítési javaslat a végleges dolgozatba
+
+A végleges dokumentumban a jelen fájl anyaga a következő szerkezetben használható fel:
+
+- **Címoldal** – külön oldal, az egyetemi mintának megfelelően.
+- **Feladatkiírás** – külön oldal, a témavezető hivatalos szövegével.
+- **Tartalmi összefoglaló** – legfeljebb egy oldal, külön részben.
+- **Tartalomjegyzék** – a végleges Word dokumentumból generálva.
+- **Érdemi rész** – a jelen fájl 3–7. fejezeteinek átdolgozott változata.
+- **Irodalomjegyzék** – sorszámozott, visszakereshető formában.
+- **Nyilatkozat** – az egyetemi mintaszöveg alapján.
+- **Mellékletek / elektronikus melléklet** – forráskód, nagyobb ábrák, tesztlogok, képernyőképek.
+
+## 0.2 Szerkesztési megjegyzések ehhez a vázlathoz
+
+- A jelen frissített változat már legfeljebb 3 címszintet használ.
+- A szöveg a **jelenlegi kódbázis** állapotához igazodik: külön backend és frontend projekt, saját kliensoldali router, központi API-réteg, auditnaplózás, CSV export, demo seed, fizetési csoport szinkron, lezárt verseny eredményjavítási feloldása, valamint meccsindítási ütközésvédelmek.
+- A végleges Word-változatban az itt szereplő „Javasolt ábrahely” megjegyzéseket tényleges ábrákkal és hivatkozásokkal kell kiváltani.
+
 # 3. Követelményspecifikáció
 
 A fejlesztett rendszer célja egy olyan webalapú tollaslabda versenykezelő alkalmazás létrehozása, amely támogatja a versenyek adminisztratív előkészítését, a lebonyolítás során szükséges operatív feladatokat, valamint az eredmények és állapotok követését. A rendszer elsődleges felhasználója a versenyszervező vagy döntnök, aki egyetlen felületen keresztül tudja kezelni a versenyhez tartozó kategóriákat, játékosokat, mérkőzéseket, állásokat és kiegészítő adminisztratív adatokat.
@@ -86,6 +109,8 @@ A nevezésekhez kapcsolódóan kezelhetőnek kell lennie:
 
 Ez a követelmény azért fontos, mert a valós versenyszervezésben a játékoslista és a nevezési adminisztráció szorosan összekapcsolódik.
 
+A jelenlegi megvalósítás alapján a nevezési adminisztráció része a fizetési csoportok kezelése is. A rendszernek támogatnia kell, hogy több nevezés egy közös fizetési csoporthoz tartozzon, és a fizetési csoport befizetettre állítása a kapcsolódó nevezések fizetési állapotát is szinkronban frissítse. Ez különösen klubos vagy egyesületi befizetések esetén hasznos.
+
 ### FR-05 Check-in és sorsoláslezárás
 
 A rendszernek támogatnia kell a check-in folyamatot, vagyis annak adminisztrálását, hogy a benevezett játékosok közül kik jelentek meg ténylegesen a versenyen. A check-in a sorsolás szempontjából kritikus lépés, mivel a tényleges indulói létszám csak ennek lezárása után tekinthető véglegesnek.
@@ -129,6 +154,8 @@ A rendszernek támogatnia kell:
 
 A rendszer ütemezési logikájának célja nem matematikailag optimális globális optimum keresése, hanem olyan gyakorlati megoldás biztosítása, amely életszerű környezetben stabilan használható.
 
+A jelenlegi működésben az ütemezés kézi indítású adminisztratív művelet, tehát a szervező explicit módon futtatja le a menetrendkészítést. Az ütemezés a még függő, ütemezhető mérkőzésekre ad időpontot és pályát, míg az eredményrögzítés önmagában nem tervez újra automatikusan. Ez a tervezési döntés csökkenti a lebonyolítás közbeni kiszámíthatatlan menetrendváltozásokat, és jobban illeszkedik a valós versenyszervezői munkafolyamathoz.
+
 ### FR-08 Mérkőzések állapotkezelése és eredményrögzítése
 
 A rendszernek támogatnia kell a mérkőzések teljes életciklusának kezelését a létrehozástól a lezárásig.
@@ -148,6 +175,8 @@ A rendszernek lehetővé kell tennie:
 - speciális kimenetek, például visszalépés vagy érvénytelenítés kezelését.
 
 A követelmény azért kiemelten fontos, mert a teljes további logika – állásszámítás, továbbjutás, playoff – a mérkőzéseredményekre épül.
+
+A jelenlegi rendszerben a mérkőzésindításnak további védelmi feltételei is vannak. Csak olyan mérkőzés indítható el, amely már kapott pályát és becsült időablakot, továbbá a backend megakadályozza, hogy ugyanazon a pályán egyszerre két futó mérkőzés legyen, illetve hogy ugyanaz a játékos egyszerre több futó mérkőzésben szerepeljen. Lezárt verseny esetén az eredményjavítás alapértelmezésben zárolt, és csak adminisztratív feloldás után engedélyezett.
 
 ### FR-09 Állásszámítás és holtversenykezelés
 
@@ -229,6 +258,20 @@ A rendszernek tehát:
 
 Ez a követelmény a stabil használhatóság alapfeltétele.
 
+A jelenlegi implementációban ez kiegészül több konkrét üzleti védőkorláttal is: a rendszer tiltja az ütemezetlen mérkőzés elindítását, a pályaütközéseket, a játékosütközéseket, valamint a lezárt verseny jogosulatlan eredménymódosítását. Ezek a korlátok nem csak felületi, hanem backend oldali ellenőrzésekkel is érvényesülnek.
+
+### FR-15 Lezárt verseny kontrollált eredményjavítása
+
+A rendszernek támogatnia kell, hogy lezárt verseny esetén az eredmények alapértelmezésben zároltak maradjanak, ugyanakkor adminisztratív döntéssel ideiglenesen feloldhatók legyenek, ha utólagos korrekció szükséges.
+
+A rendszernek biztosítania kell:
+- a lezárt verseny eredményzárolt állapotának nyilvántartását,
+- a feloldás és visszazárás adminisztratív műveletét,
+- annak biztosítását, hogy feloldás nélkül ne legyen mód pontszám- vagy állapotmódosításra,
+- a javítás utáni kontrollált visszazárást.
+
+Ez a követelmény azért fontos, mert valós versenyhelyzetben előfordulhat, hogy rosszul bemondott eredményt kell korrigálni, ugyanakkor a lezárt verseny adatainak általános módosíthatósága nem kívánatos.
+
 ## 3.2 Nem-funkcionális követelmények
 
 ### NFR-01 Megbízhatóság és konzisztencia
@@ -276,6 +319,10 @@ A rendszerben végzett fontosabb műveleteknek utólag is visszakövethetőknek 
 
 A rendszernek olyan architektúrában kell készülnie, amely lehetővé teszi további funkciók későbbi hozzáadását. Ilyen lehet például új exportformátumok bevezetése, fejlettebb jogosultságkezelés, fejlettebb ütemezési logika, importfunkciók vagy nyilvánosabb megjelenítési módok.
 
+### NFR-11 Lokalizált és egységes felhasználói kommunikáció
+
+A rendszer felhasználói felületének és hibaüzeneteinek a dolgozat nyelvéhez igazodóan egységesen magyar nyelvűnek kell lennie. A hibák megfogalmazásának rövidnek, egyértelműnek és lehetőség szerint a végrehajtandó teendőre is utalónak kell lennie.
+
 ## 3.3 Elfogadási kritériumok
 
 A rendszer akkor tekinthető a követelmények szempontjából elfogadhatónak, ha az alábbi feltételek teljesülnek.
@@ -296,6 +343,7 @@ A rendszer akkor tekinthető a követelmények szempontjából elfogadhatónak, 
 
 - Egy kategóriához játékosok adhatók hozzá egyenként és tömegesen is.
 - A rendszer nyilvántartja a nevezési adatok és a fizetési állapotok alapvető mezőit.
+- Fizetési csoport használatakor a csoportszintű befizetés a kapcsolódó nevezések állapotát is konzisztensen frissíti.
 - A játékosok check-in állapota külön kezelhető.
 
 ### AC-04 Csoportkör és mérkőzésgenerálás
@@ -309,12 +357,14 @@ A rendszer akkor tekinthető a követelmények szempontjából elfogadhatónak, 
 - A pending mérkőzésekhez kezdési időpont és pályaszám rendelhető.
 - Az ütemezés figyelembe veszi a megadott alapvető pihenőidő-paramétereket.
 - A rendszer több kategória esetén is képes használható beosztást előállítani.
+- A már futó mérkőzések és az ütemezési adatok alapján nem engedhető meg pályaütközés vagy játékosütközés a meccsindítás során.
 
 ### AC-06 Eredményrögzítés és állásfrissítés
 
 - A mérkőzés eredménye szettekre bontva rögzíthető.
 - A mérkőzés állapota megfelelően változik.
 - A rögzített eredmény hatására a csoportállás automatikusan frissül.
+- Lezárt versenyben az eredmény módosítása csak akkor engedélyezett, ha az adminisztrátor előbb feloldotta az eredményjavítási zárolást.
 
 ### AC-07 Holtverseny és továbbjutás
 
@@ -338,12 +388,19 @@ A rendszer akkor tekinthető a követelmények szempontjából elfogadhatónak, 
 - Hibás vagy nem létező azonosító megadása esetén a rendszer nem omlik össze.
 - A backend kontrollált hibaválaszt ad.
 - A frontend nem tesz lehetővé értelmetlen vagy nem kontextusos műveleteket.
+- A backend pálya-, játékos- és lezárt állapothoz kapcsolódó üzleti védelmei akkor is érvényesülnek, ha a kliens hibás kérést küld.
 
 ### AC-11 Bemutathatóság
 
 - A rendszer demo adatokkal feltölthető.
 - Ismert tesztfelhasználóval belépve a fő folyamatok végigmutathatók.
 - Egyetlen felhasználói fiók alatt több, eltérő állapotú verseny is megjeleníthető.
+
+### AC-12 Kontrollált eredményjavítás
+
+- Lezárt versenyben a mérkőzések eredménye alapállapotban nem módosítható.
+- Az adminisztrátor képes a lezárt verseny eredményjavítási zárolását feloldani és visszazárni.
+- Feloldás után a szükséges korrekció elvégezhető, majd a verseny újra zárolható.
 
 ## 3.4 A jelen verzió határai
 
@@ -411,6 +468,8 @@ A frontend oldalstruktúrája a tényleges munkafolyamatot követi. Ennek megfel
 A frontend útvonalkezelése kliensoldalon történik. A router csak olyan dinamikus útvonalakat tekint érvényesnek, amelyekben a verseny- és kategóriaazonosítók ObjectId formátumúnak megfelelőek. Ez azért fontos tervezési döntés, mert így bizonyos hibás navigációs helyzetek már kliensoldalon kiszűrhetők, és nem vezetnek felesleges backend hibákhoz.
 
 A frontend és backend közötti kommunikáció egy külön API-szolgáltatási rétegen keresztül történik. Ez a réteg egységesíti a HTTP-hívásokat, kezeli a JSON kéréseket és válaszokat, valamint egységes hibakezelési modellt biztosít. Ennek eredményeként az oldalak és komponensek nem közvetlenül a `fetch` hívásokat használják, hanem egy központi API interfészen keresztül kommunikálnak a szerverrel.
+
+A jelenlegi frontend szerkezetben a megjelenítéshez külön formázó segédfüggvények (`formatters.jsx`), az API-válaszok felhasználóbarát, magyar nyelvű kezeléséhez pedig központi hibaüzenet-fordító modul (`errorMessages.js`) is tartozik. Ez segít abban, hogy a felületen ne nyers backend üzenetek vagy belső enumértékek jelenjenek meg.
 
 ### 4.1.3 Backend architektúra
 
@@ -553,6 +612,8 @@ A konfiguráció beágyazott alstruktúraként jelenik meg, amely többek közö
 - nevezési díj használata,
 - nevezési díj összege.
 
+A jelenlegi modellben a versenyhez tartozik egy külön `finishedResultEditUnlocked` logikai mező is, amely azt jelzi, hogy lezárt állapotban a mérkőzéseredmények javítása ideiglenesen engedélyezett-e. Ez a mező a lezárt versenyek kontrollált korrekcióját támogatja.
+
 A `Tournament` központi szerepe miatt gyakorlatilag minden operatív entitás kapcsolódik hozzá. Ennek következtében a `Tournament` entitás és a következő entitások között egy-a-többhöz kapcsolat áll fenn:
 - `Category`
 - `Player`
@@ -622,6 +683,8 @@ A modell egyedi indexet használ a `categoryId` és `playerId` mezőpáron, így
 
 Az `Entry` entitás fontos szerepe, hogy elválasztja a sporttechnikai játékosadatot a pénzügyi-adminisztratív nevezési adattól.
 
+A jelenlegi implementációban a nevezések fizetési állapota a fizetési csoportokhoz is kapcsolódik. Ha egy nevezés fizetési csoporthoz tartozik, akkor a csoport befizetett állapotának módosítása a kapcsolódó nevezések `paid` mezőit is konzisztensen frissíti.
+
 ### 4.2.7 PaymentGroup entitás
 
 A `PaymentGroup` entitás több nevezés közös pénzügyi kezelésére szolgál. Ez akkor hasznos, ha például egy klub vagy csapat egyszerre több játékos nevezési díját rendezi.
@@ -637,6 +700,8 @@ A payment group főbb mezői:
 A `PaymentGroup` és az `Entry` között egy-a-többhöz kapcsolat áll fenn:
 - egy payment group több nevezéshez kapcsolódhat;
 - egy nevezés legfeljebb egy payment grouphoz tartozhat.
+
+A megvalósítás fontos részlete, hogy a payment group nem csupán leíró vagy számlázási csoportosító szerepet tölt be, hanem a befizetettség konzisztenciáját is kezeli. A csoport szintű befizetés ezért a felületen és backend oldalon is tényleges tömeges adminisztratív műveletként jelenik meg.
 
 ### 4.2.8 Group entitás
 
@@ -802,11 +867,12 @@ A főbb végpontok:
 - `PATCH /api/tournaments/:id`
 - `POST /api/tournaments/:id/start`
 - `POST /api/tournaments/:id/finish`
+- `PATCH /api/tournaments/:id/finished-edit-lock`
 - `POST /api/tournaments/configure`
 
 A `POST /configure` végpont speciális szerepet tölt be, mert egyetlen tranzakciós műveletként képes létrehozni a versenyt és a hozzá tartozó kategóriákat. Ez a megoldás különösen hasznos akkor, amikor a felhasználó nem lépésenként akarja felépíteni a versenyt, hanem egy konfigurációs képernyőről szeretné elindítani a teljes alapstruktúrát.
 
-A `start` és `finish` végpontok a verseny állapotát vezérlik, így a rendszer életciklus-szemléletet követ, nem pusztán statikus adatrekordokkal dolgozik.
+A `start` és `finish` végpontok a verseny állapotát vezérlik, így a rendszer életciklus-szemléletet követ, nem pusztán statikus adatrekordokkal dolgozik. A `finished-edit-lock` végpont ennek kiegészítéseként kontrollált adminisztratív feloldást biztosít a lezárt versenyek utólagos eredménykorrekciójához.
 
 ### 4.3.4 Kategóriakezelési végpontok
 
@@ -856,7 +922,7 @@ A payment group műveletek főbb végpontjai:
 
 A játékos és nevezés szétválasztása azért előnyös, mert a sporttechnikai és adminisztratív adatok külön életciklust követnek. Egy játékos rekord elsősorban a versenyző személyét reprezentálja, míg a nevezési rekord a díjfizetéshez, számlázáshoz és nevezési adminisztrációhoz tartozó információkat tárolja.
 
-A `sync-missing` végpont azt a gyakorlati problémát kezeli, hogy a rendszerben már létező játékosokhoz szükség esetén automatikusan létrehozhatók a hiányzó nevezési rekordok.
+A `sync-missing` végpont azt a gyakorlati problémát kezeli, hogy a rendszerben már létező játékosokhoz szükség esetén automatikusan létrehozhatók a hiányzó nevezési rekordok. A fizetési csoportokat kezelő végpontok ezen felül a csoportszintű befizetés és a kapcsolt nevezések fizetési állapota közötti szinkront is biztosítják.
 
 ### 4.3.6 Csoportokhoz és állásokhoz kapcsolódó végpontok
 
@@ -893,7 +959,7 @@ A főbb végpontok:
 - `POST /api/matches/tournament/:tournamentId/schedule/global`
 - `PATCH /api/matches/group/:groupId/schedule/reset`
 
-A mérkőzések generálása csoportszinten történik. A státuszfrissítés és eredményrögzítés külön végpontokban valósul meg, mert ezek eltérő validációs logikát követnek. Az `outcome` végpont speciális kimenetelek, például walkover vagy void kezelésére szolgál.
+A mérkőzések generálása csoportszinten történik. A státuszfrissítés és eredményrögzítés külön végpontokban valósul meg, mert ezek eltérő validációs logikát követnek. Az `outcome` végpont speciális kimenetelek, például walkover vagy void kezelésére szolgál. A mérkőzésindításnál a backend külön ellenőrzi a pálya- és játékosütközéseket, valamint azt is, hogy a meccs rendelkezik-e ütemezési adatokkal.
 
 Az ütemezés két szinten jelenik meg:
 - csoportszintű schedule generálás,
@@ -1097,6 +1163,8 @@ A `delete_results` esetben az érintett játékos meccsei void státuszba kerül
 A `keep_results` esetben a már lejátszott meccsek eredménye megmarad, a még nem lejátszott mérkőzések pedig walkover jellegű lezárást kaphatnak. A rendszer ezekhez `wo` típusú eredményt rendel.
 
 A speciális meccskimenetelek külön végponttal kezelhetők, így a mérkőzéséletciklus nem csak normál lejátszott eredményekre épül.
+
+A rendszer jelenlegi állapotában ehhez kapcsolódik a lezárt versenyek kontrollált eredményjavítási mechanizmusa is. A lezárás után a meccsek módosítása alapértelmezésben tiltott, de adminisztratív feloldással ideiglenesen engedélyezhető, majd a korrekció után újra visszazárható. Ez a megközelítés jobban illeszkedik a valós versenyhelyzetekhez, mint a korlátlan utólagos szerkeszthetőség.
 
 ### 4.4.7 Ütemezési algoritmus
 
@@ -1430,6 +1498,8 @@ A frontendben több kisebb, újrafelhasználható komponens segíti a megjelení
 
 A komponensek célja nem egy komplex design system kialakítása, hanem az, hogy a gyakran előforduló felületi minták egységesen jelenjenek meg. Ez javítja a használhatóságot és csökkenti a duplikált JSX kód mennyiségét.
 
+A nézetek munkáját több kisebb szolgáltatási segédmodul is támogatja, például a formátum- és státuszmegjelenítést végző formatterek, valamint az API-hibák magyar nyelvű visszaadását végző hibaüzenet-fordító réteg. Ezek hozzájárulnak a felület konzisztens, végfelhasználóbarát működéséhez.
+
 ### 5.2.6 Állapotkezelési stratégia
 
 A frontend nem használ különálló globális állapotkezelő könyvtárat, például Reduxot. Ehelyett a megvalósítás az alábbi kombinációra épül:
@@ -1511,6 +1581,8 @@ A hibakezelés a rendszer mindkét oldalán fontos megvalósítási szempont vol
 
 A frontend API-rétege igyekszik minden hibás választ értelmezhető JavaScript hibává alakítani. Ha a backend JSON hibaválaszt ad, a felhasználó számára megjeleníthető hibaüzenet a válaszból kerül kiolvasásra. Ha a szerver nem megfelelő formátumú választ küld, a kliens külön hibát generál erre is.
 
+A frontend oldalon a központi API-réteg a backendtől érkező hibákat egy fordító modulon keresztül magyar nyelvű, konzisztens üzenetekké alakítja. Ez különösen fontos olyan műveleteknél, mint a meccsindítás, az eredményrögzítés vagy a lezárt versenyek állapotkezelése.
+
 A backend oldalon a route-ok több helyen explicit védelmet tartalmaznak:
 - hibás azonosítók esetén kontrollált hiba,
 - nem létező erőforrás esetén megfelelő státuszkód,
@@ -1581,7 +1653,7 @@ A tesztelés tehát erősen követelményvezérelt módon történt: minden lén
 
 A megvalósított tesztelési megközelítés három egymást kiegészítő szintből áll.
 
-#### 1. Logikai és szolgáltatási szintű ellenőrzések
+**1. Logikai és szolgáltatási szintű ellenőrzések**
 
 Ezen a szinten a fókusz a kulcsalgoritmusokon volt. Ide tartozott például:
 - round robin párosítási logika,
@@ -1592,7 +1664,7 @@ Ezen a szinten a fókusz a kulcsalgoritmusokon volt. Ide tartozott például:
 
 Ezek az ellenőrzések különösen fontosak, mert a rendszer szakmai helyessége döntően ezeken múlik.
 
-#### 2. Integrációs és smoke tesztek
+**2. Integrációs és smoke tesztek**
 
 A második szint a backend végpontok és az egymásra épülő üzleti lépések ellenőrzésére szolgált. Ezek a tesztek tipikusan nem egyetlen függvény helyességét vizsgálják, hanem teljes folyamatokat, például:
 - felhasználó létrehozása és hitelesítés,
@@ -1606,7 +1678,7 @@ A második szint a backend végpontok és az egymásra épülő üzleti lépése
 
 A smoke tesztek célja annak ellenőrzése volt, hogy a rendszer fő működési útvonalai nem törtek el egy-egy módosítás után.
 
-#### 3. Manuális végponttól végpontig tesztelés
+**3. Manuális végponttól végpontig tesztelés**
 
 A harmadik szintet a frontendből végzett kézi tesztelés jelentette. Ennek során a tényleges felhasználói munkafolyamatok kerültek kipróbálásra:
 - regisztráció,
@@ -1972,6 +2044,81 @@ Két különböző felhasználó létezik eltérő versenyekkel.
 - A demo user és a demo versenyek létrejönnek.  
 - A rendszer bemutatási környezetben azonnal használható.  
 
+### TC-21 Pályaütközés tiltása meccsindításkor
+
+**Kapcsolódó követelmények:** FR-08, FR-14, AC-05, AC-10
+
+**Kiinduló állapot:**  
+Az egyik pályán már fut egy mérkőzés, ugyanarra a pályára pedig létezik egy másik, még nem indított mérkőzés.
+
+**Tesztlépések:**  
+1. Egy futó mérkőzés mellett megpróbálni elindítani egy másik mérkőzést ugyanazon a pályán.  
+
+**Elvárt eredmény:**  
+- A backend a műveletet visszautasítja.  
+- A második mérkőzés nem kerül `running` állapotba.  
+
+### TC-22 Játékosütközés tiltása meccsindításkor
+
+**Kapcsolódó követelmények:** FR-08, FR-14, AC-05, AC-10
+
+**Kiinduló állapot:**  
+Az egyik játékos már szerepel egy futó mérkőzésben.
+
+**Tesztlépések:**  
+1. Megkísérelni elindítani egy másik olyan mérkőzést, amelyben ugyanaz a játékos szerepel.  
+
+**Elvárt eredmény:**  
+- A backend a műveletet visszautasítja.  
+- Egy játékos egyszerre csak egy futó mérkőzésben szerepelhet.  
+
+### TC-23 Ütemezetlen mérkőzés indításának tiltása
+
+**Kapcsolódó követelmények:** FR-08, FR-14, AC-10
+
+**Kiinduló állapot:**  
+Létezik olyan pending mérkőzés, amelyhez nincs pályaszám vagy időpont rendelve.
+
+**Tesztlépések:**  
+1. Megpróbálni a mérkőzést `running` állapotba tenni.  
+
+**Elvárt eredmény:**  
+- A backend a műveletet visszautasítja.  
+- Csak ténylegesen beütemezett mérkőzés indítható el.  
+
+### TC-24 Lezárt verseny eredményzárolása és feloldása
+
+**Kapcsolódó követelmények:** FR-15, AC-12
+
+**Kiinduló állapot:**  
+A verseny állapota `finished`, az eredményjavítás zárolt.
+
+**Tesztlépések:**  
+1. Megpróbálni egy lezárt verseny meccsének eredményét módosítani.  
+2. Adminisztrátori művelettel feloldani az eredményjavítási zárolást.  
+3. Újra megpróbálni az eredmény módosítását.  
+4. A javítás után visszazárni a lezárt versenyt.  
+
+**Elvárt eredmény:**  
+- Feloldás nélkül a módosítás tiltott.  
+- Feloldás után a javítás elvégezhető.  
+- Visszazárás után a további módosítás ismét tiltott.  
+
+### TC-25 Fizetési csoport és nevezések szinkronja
+
+**Kapcsolódó követelmények:** FR-04, AC-03
+
+**Kiinduló állapot:**  
+Több nevezés ugyanahhoz a fizetési csoporthoz tartozik, és a csoport kezdetben nincs befizetve.
+
+**Tesztlépések:**  
+1. A fizetési csoportot befizetettre állítani.  
+2. A kapcsolódó nevezések listáját újralekérdezni.  
+
+**Elvárt eredmény:**  
+- A csoport befizetett állapotba kerül.  
+- A kapcsolódó nevezések `paid` mezői is frissülnek.  
+
 ## 6.3 Edge case-ek és kritikus helyzetek
 
 A rendszer egyik legfontosabb minőségi szempontja, hogy ne csak tipikus bemenetek mellett működjön helyesen. A tollaslabda versenykezelésben több olyan speciális helyzet fordulhat elő, amely külön kezelést igényel. Ezek közül a legfontosabbak az alábbiak.
@@ -2034,7 +2181,20 @@ Ennek kezelése során külön ellenőrizni kellett:
 
 Ez a tesztelési terület jól mutatta, hogy a használhatósági és stabilitási hibák gyakran nem az algoritmusokban, hanem a képernyők közötti átmenetekben jelennek meg.
 
-### 6.3.7 Hibás vagy hiányos azonosítók
+### 6.3.7 Pálya- és játékosütközések
+
+A mérkőzések életciklusának egyik kritikus speciális esete, amikor a szervező vagy a felület hibás sorrendben próbál meccset indítani. A jelenlegi rendszerben külön vizsgálni kellett, hogy:
+- ugyanazon a pályán egyszerre ne futhasson két mérkőzés,
+- ugyanaz a játékos ne szerepelhessen párhuzamosan két futó meccsben,
+- ütemezetlen mérkőzés ne indulhasson el.
+
+Ezek a szabályok azért fontosak, mert az ütemezésből önmagában még nem következik automatikusan, hogy a futó állapotba váltás üzletileg helyes. A védelemnek ezért backend oldalon is érvényesülnie kell.
+
+### 6.3.8 Lezárt verseny utólagos korrekciója
+
+Külön edge case-ként jelent meg a lezárt versenyek eredményeinek javítása. Teljes tiltás esetén a rendszer túl merev, korlátlan szerkeszthetőség esetén viszont sérül a lezárt állapot jelentése. A jelenlegi megoldás egy köztes modellt alkalmaz: a verseny lezárása után az eredmények zároltak, de adminisztratív feloldással ideiglenesen javíthatók.
+
+### 6.3.9 Hibás vagy hiányos azonosítók
 
 Kritikus ellenőrzési pont volt, hogy a backend hogyan viselkedik hibás vagy hiányzó azonosítók esetén. A cél az volt, hogy:
 - ne jöjjön létre Mongoose cast hiba miatti szerverösszeomlás,
@@ -2043,7 +2203,7 @@ Kritikus ellenőrzési pont volt, hogy a backend hogyan viselkedik hibás vagy h
 
 Ez a fajta tesztelés a robusztusság egyik közvetlen mérőszáma.
 
-### 6.3.8 Demo adatkészlet és bemutatási állapot
+### 6.3.10 Demo adatkészlet és bemutatási állapot
 
 A rendszer demonstrációs használatára tekintettel külön edge case-nek tekinthető, hogy az adatbázis üres vagy nem megfelelő állapotban van. Ennek megoldására szolgál a demo seed, amely:
 - ismert felhasználót hoz létre,
@@ -2061,6 +2221,9 @@ Különösen erős területek:
 - a playoff generálás,
 - a konfigurálható eredményvalidáció,
 - a több kategóriára kiterjedő ütemezési támogatás,
+- a pálya- és játékosütközések backend oldali kivédése,
+- a lezárt versenyek kontrollált eredményjavítási mechanizmusa,
+- a fizetési csoportok és nevezések szinkronizált kezelése,
 - az audit és export funkciók,
 - a demo adatkészletre épülő bemutathatóság.
 
@@ -2168,6 +2331,7 @@ A rendszer bemutathatóságát és gyakorlati használhatóságát tovább javí
 - egyszerű hosztolt demóverzió,
 - automatikus demo reset,
 - publikus megosztható board linkek,
+- nyilvános vagy félpublikus eredményhirdető nézet,
 - importfunkciók külső táblázatokból.
 
 Hosszabb távon akár olyan integrációs lehetőségek is megjelenhetnének, mint:
