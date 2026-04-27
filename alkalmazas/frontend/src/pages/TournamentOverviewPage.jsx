@@ -6,6 +6,7 @@ import { StatCard } from '../components/StatCard.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
+import { formatCategoryFormat, formatStatusLabel } from '../services/formatters.jsx';
 
 export function TournamentOverviewPage({ params }) {
   const { id } = params;
@@ -46,6 +47,15 @@ export function TournamentOverviewPage({ params }) {
     }
   }
 
+  async function toggleFinishedEditLock(unlocked) {
+    try {
+      const updated = await api.patch(`/api/tournaments/${id}/finished-edit-lock`, { unlocked }, { token: auth.token });
+      setTournament(updated);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   if (!tournament) {
     return <div className="muted">{error || 'Betöltés...'}</div>;
   }
@@ -54,14 +64,14 @@ export function TournamentOverviewPage({ params }) {
 
   return (
     <div className="stack-xl">
-      <BackLink to="/">Vissza a dashboardra</BackLink>
+      <BackLink to="/">Vissza a főoldalra</BackLink>
       <PageHeader
         eyebrow="Verseny áttekintése"
         title={tournament.name}
         description={tournament.location || 'A verseny központi adminisztrációs oldala, innen érhető el minden fő művelet.'}
         action={
           <StatusBadge tone={tournament.status === 'running' ? 'success' : tournament.status === 'finished' ? 'warning' : 'neutral'}>
-            {tournament.status}
+            {formatStatusLabel(tournament.status)}
           </StatusBadge>
         }
       />
@@ -88,7 +98,7 @@ export function TournamentOverviewPage({ params }) {
                 <span>Játékosok, nevezések és nevezési díj státuszok kezelése.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/checkin`}>
-                <strong>Check-in</strong>
+                <strong>Jelenlét</strong>
                 <span>Jelenlétkezelés versenynapi használatra.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/matches`}>
@@ -100,7 +110,7 @@ export function TournamentOverviewPage({ params }) {
                 <span>Globális ütemező és pályanézet.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/board`}>
-                <strong>Board</strong>
+                <strong>Kijelző</strong>
                 <span>Futó és következő meccsek kijelzős nézete.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/payments`}>
@@ -131,8 +141,8 @@ export function TournamentOverviewPage({ params }) {
                   {categories.map((category) => (
                     <tr key={category._id}>
                       <td>{category.name}</td>
-                      <td>{category.format}</td>
-                      <td><StatusBadge>{category.status}</StatusBadge></td>
+                      <td>{formatCategoryFormat(category.format)}</td>
+                      <td><StatusBadge>{formatStatusLabel(category.status)}</StatusBadge></td>
                       <td>
                         <AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${category._id}`}>
                           Megnyitás
@@ -159,7 +169,7 @@ export function TournamentOverviewPage({ params }) {
               </div>
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Állapot</span>
-                <span className="key-value-list__value">{tournament.status}</span>
+                <span className="key-value-list__value">{formatStatusLabel(tournament.status)}</span>
               </div>
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Pályák</span>
@@ -175,6 +185,38 @@ export function TournamentOverviewPage({ params }) {
               </button>
               <button className="button button--secondary button--block" type="button" disabled={tournament.status !== 'running'} onClick={() => changeStatus('finish')}>
                 Verseny lezárása
+              </button>
+            </div>
+          </SectionCard>
+
+          <SectionCard
+            title="Lezárt eredmények javítása"
+            subtitle="Alapesetben a lezárt verseny eredményei zároltak. Szükség esetén ideiglenesen feloldhatók javításra."
+          >
+            <div className="stack-md">
+              <div className="key-value-list">
+                <div className="key-value-list__row">
+                  <span className="key-value-list__label">Feloldás állapota</span>
+                  <span className="key-value-list__value">
+                    {tournament.finishedResultEditUnlocked ? 'Feloldva' : 'Zárolva'}
+                  </span>
+                </div>
+              </div>
+              <button
+                className="button button--ghost button--block"
+                type="button"
+                disabled={tournament.status !== 'finished' || tournament.finishedResultEditUnlocked}
+                onClick={() => toggleFinishedEditLock(true)}
+              >
+                Eredményjavítás feloldása
+              </button>
+              <button
+                className="button button--secondary button--block"
+                type="button"
+                disabled={tournament.status !== 'finished' || !tournament.finishedResultEditUnlocked}
+                onClick={() => toggleFinishedEditLock(false)}
+              >
+                Eredményjavítás visszazárása
               </button>
             </div>
           </SectionCard>

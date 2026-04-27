@@ -48,7 +48,7 @@ function HowItWorks({ open, onToggle }) {
           </p>
           <h4>Meccsszabályok</h4>
           <p>
-            A <em>Best of</em> beállítás meghatározza, hány nyert szettig tart egy meccs (BO3 = aki előbb nyer 2-t).
+            A nyert szettek száma beállítás határozza meg, hány megnyert szettig tart egy meccs (például BO3 esetén az nyer, aki előbb 2 szettet nyer).
             A <em>ponthatár</em> és <em>pontelőny</em> a szett végét szabja meg – tollaslabdában általában 21 pontig,
             2 pontos előnnyel, 30-as plafonnal.
           </p>
@@ -181,11 +181,11 @@ export function TournamentCreatePage() {
 
             <SectionCard title="Meccsszabályok" subtitle="Az egész versenyre vonatkozó alapértelmezés – kategóriánként felülbírálható.">
               <div className="form-grid form-grid--two">
-                <FormField label="Szett rendszer (Best of)" htmlFor="bestOf">
+                <FormField label="Szett rendszer" htmlFor="bestOf">
                   <select id="bestOf" value={form.bestOf} onChange={(e) => update('bestOf', Number(e.target.value))}>
-                    <option value={1}>Best of 1</option>
-                    <option value={3}>Best of 3</option>
-                    <option value={5}>Best of 5</option>
+                    <option value={1}>1 nyert szett</option>
+                    <option value={3}>2 nyert szett (BO3)</option>
+                    <option value={5}>3 nyert szett (BO5)</option>
                   </select>
                 </FormField>
                 <FormField label="Szett hossza (pont)" htmlFor="pointsToWin" hintText="Általában 21.">

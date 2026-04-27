@@ -8,6 +8,9 @@ import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '..
 const router = Router();
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
+/**
+ * A fizetési csoport tagságát és a kapcsolt nevezések befizetett állapotát szinkronban tartja.
+ */
 async function syncPaymentGroupEntries(group, entryIds = []) {
     const uniqueIds = [...new Set(entryIds.map(String))];
     const entries = uniqueIds.length > 0
@@ -15,7 +18,7 @@ async function syncPaymentGroupEntries(group, entryIds = []) {
         : [];
 
     if (entries.length !== uniqueIds.length) {
-        throw new Error('One or more entryIds are invalid for this tournament');
+        throw new Error('A megadott nevezések között van érvénytelen ehhez a versenyhez.');
     }
 
     await Entry.updateMany(
@@ -31,6 +34,7 @@ async function syncPaymentGroupEntries(group, entryIds = []) {
     }
 }
 
+/** A fizetési csoportokhoz tartozó nevezések darabszámát és összegét számolja ki. */
 async function getPaymentGroupStats(groupIds = []) {
     if (groupIds.length === 0) return new Map();
 
@@ -66,7 +70,7 @@ router.get('/', async (req, res) => {
     const filter = {};
 
     if (req.query.tournamentId) {
-        if (!isValidId(req.query.tournamentId)) return res.status(400).json({ error: 'Invalid tournamentId' });
+        if (!isValidId(req.query.tournamentId)) return res.status(400).json({ error: 'Érvénytelen versenyazonosító.' });
         const t = await assertTournamentOwned(req.query.tournamentId, req.user._id, { lean: true });
         if (!t) return res.json([]);
         filter.tournamentId = req.query.tournamentId;
@@ -95,13 +99,13 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { tournamentId, payerName, billingName = '', billingAddress = '', paid = false, note = '', entryIds = [] } = req.body ?? {};
-        if (!tournamentId || !isValidId(tournamentId)) return res.status(400).json({ error: 'Invalid tournamentId' });
-        if (!payerName || typeof payerName !== 'string' || !payerName.trim()) return res.status(400).json({ error: 'payerName is required' });
-        if (typeof paid !== 'boolean') return res.status(400).json({ error: 'paid must be a boolean' });
+        if (!tournamentId || !isValidId(tournamentId)) return res.status(400).json({ error: 'Érvénytelen versenyazonosító.' });
+        if (!payerName || typeof payerName !== 'string' || !payerName.trim()) return res.status(400).json({ error: 'A fizető neve kötelező.' });
+        if (typeof paid !== 'boolean') return res.status(400).json({ error: 'A befizetett állapot csak igaz vagy hamis érték lehet.' });
 
         const tournament = await assertTournamentOwned(tournamentId, req.user._id);
-        if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
-        if (tournament.status === 'finished') return res.status(409).json({ error: 'Tournament finished' });
+        if (!tournament) return res.status(404).json({ error: 'A verseny nem található.' });
+        if (tournament.status === 'finished') return res.status(409).json({ error: 'A verseny már lezárt.' });
 
         const group = await PaymentGroup.create({
             tournamentId,
@@ -134,21 +138,21 @@ router.post('/', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
     const { group, tournament } = await loadOwnedPaymentGroup(req.params.id, req.user._id);
-    if (!group) return res.status(404).json({ error: 'Payment group not found' });
-    if (tournament.status === 'finished') return res.status(409).json({ error: 'Tournament finished' });
+    if (!group) return res.status(404).json({ error: 'A fizetési csoport nem található.' });
+    if (tournament.status === 'finished') return res.status(409).json({ error: 'A verseny már lezárt.' });
 
     try {
         const before = pickAuditFields(group, AUDIT_SNAPSHOT_FIELDS.paymentGroup);
         const { payerName, billingName, billingAddress, paid, note, entryIds } = req.body ?? {};
 
         if (payerName !== undefined) {
-            if (typeof payerName !== 'string' || !payerName.trim()) return res.status(400).json({ error: 'payerName is required' });
+            if (typeof payerName !== 'string' || !payerName.trim()) return res.status(400).json({ error: 'A fizető neve kötelező.' });
             group.payerName = payerName.trim();
         }
         if (billingName !== undefined) group.billingName = typeof billingName === 'string' ? billingName.trim() : '';
         if (billingAddress !== undefined) group.billingAddress = typeof billingAddress === 'string' ? billingAddress.trim() : '';
         if (paid !== undefined) {
-            if (typeof paid !== 'boolean') return res.status(400).json({ error: 'paid must be a boolean' });
+            if (typeof paid !== 'boolean') return res.status(400).json({ error: 'A befizetett állapot csak igaz vagy hamis érték lehet.' });
             group.paid = paid;
         }
         if (note !== undefined) group.note = typeof note === 'string' ? note.trim() : '';

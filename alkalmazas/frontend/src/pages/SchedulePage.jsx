@@ -148,7 +148,7 @@ export function SchedulePage({ params }) {
           <SectionCard title="Kapcsolódó oldalak">
             <div className="stack-md">
               <AppLink className="button button--ghost button--block" to={`/tournaments/${id}/matches`}>Meccsek oldal</AppLink>
-              <AppLink className="button button--ghost button--block" to={`/tournaments/${id}/board`}>Board előnézet</AppLink>
+              <AppLink className="button button--ghost button--block" to={`/tournaments/${id}/board`}>Kijelző előnézet</AppLink>
             </div>
           </SectionCard>
         </aside>

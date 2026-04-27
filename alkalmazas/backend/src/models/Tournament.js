@@ -52,6 +52,9 @@ const tournamentSchema = new mongoose.Schema(
 
         status: { type: String, enum: ['draft', 'running', 'finished'], default: 'draft' },
 
+        // Lezárt versenynél alapból tiltjuk az eredménymódosítást, de szükség esetén adminból feloldható.
+        finishedResultEditUnlocked: { type: Boolean, default: false },
+
         config: { type: configSchema, default: () => ({}) },
 
         referees: { type: [refereeSchema], default: [] }

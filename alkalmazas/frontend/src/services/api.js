@@ -1,10 +1,16 @@
+import { translateApiErrorMessage } from './errorMessages.js';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? '';
 
+/** Összefűzi a relatív útvonalat a konfigurált API alappal. */
 function joinUrl(path) {
   if (!path.startsWith('/')) return `${API_BASE}/${path}`;
   return `${API_BASE}${path}`;
 }
 
+/**
+ * Egységesen feldolgozza a backend válaszát, és a hibákat magyar felhasználói üzenetté alakítja.
+ */
 async function parseResponse(response) {
   const text = await response.text();
   const contentType = response.headers.get('content-type') ?? '';
@@ -28,8 +34,8 @@ async function parseResponse(response) {
   }
 
   if (!response.ok) {
-    const message = data?.error || data?.message || 'Ismeretlen hiba történt.';
-    const error = new Error(message);
+    const rawMessage = data?.error || data?.message || 'Ismeretlen hiba történt.';
+    const error = new Error(translateApiErrorMessage(rawMessage, response.status));
     error.status = response.status;
     error.data = data;
     throw error;

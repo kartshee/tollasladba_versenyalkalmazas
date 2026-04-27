@@ -28,7 +28,7 @@ export function formatStatusLabel(status) {
     running: 'Folyamatban',
     finished: 'Lezárt',
     setup: 'Beállítás',
-    checkin_open: 'Check-in nyitva',
+    checkin_open: 'Jelenlét nyitva',
     draw_locked: 'Sorsolás lezárva',
     in_progress: 'Folyamatban',
     completed: 'Befejezve',
@@ -84,4 +84,14 @@ export function normalizeSearch(value) {
 
 export function byName(a, b) {
   return String(a ?? '').localeCompare(String(b ?? ''), 'hu');
+}
+
+
+export function formatCategoryFormat(value) {
+  const labels = {
+    group: 'Csoportkör',
+    'group+playoff': 'Csoportkör + rájátszás',
+    playoff: 'Egyenes kiesés'
+  };
+  return labels[value] ?? value ?? '—';
 }

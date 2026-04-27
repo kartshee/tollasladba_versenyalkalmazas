@@ -44,9 +44,21 @@ async function loadOwnedTournamentMatchRules(tournamentId, userId) {
     };
 }
 
-function ensureMatchResultEditable(match, res) {
+function ensureMatchResultEditable(match, tournament, res) {
     if (match.voided) {
-        res.status(409).json({ error: 'Cannot modify a voided match' });
+        res.status(409).json({ error: 'Érvénytelenített meccs nem módosítható.' });
+        return false;
+    }
+    if (tournament?.status === 'finished' && tournament?.finishedResultEditUnlocked !== true) {
+        res.status(409).json({ error: 'A lezárt verseny eredményei jelenleg zároltak. Előbb oldd fel az eredményjavítást.' });
+        return false;
+    }
+    return true;
+}
+
+function ensureTournamentAllowsMatchChanges(tournament, res) {
+    if (tournament?.status === 'finished' && tournament?.finishedResultEditUnlocked !== true) {
+        res.status(409).json({ error: 'A lezárt verseny jelenleg zárolt, ezért a meccs nem módosítható.' });
         return false;
     }
     return true;
@@ -114,7 +126,7 @@ router.get('/', async (req, res) => {
 
 router.get('/group/:groupId', async (req, res) => {
     const { group } = await loadOwnedGroup(req.params.groupId, req.user._id);
-    if (!group) return res.status(404).json({ error: 'Group not found' });
+    if (!group) return res.status(404).json({ error: 'A csoport nem található.' });
 
     const matches = await Match.find({ groupId: req.params.groupId })
         .sort({ startAt: 1, createdAt: 1 })
@@ -128,16 +140,16 @@ router.get('/group/:groupId', async (req, res) => {
 router.post('/group/:groupId', async (req, res) => {
     try {
         const { group } = await loadOwnedGroup(req.params.groupId, req.user._id);
-        if (!group) return res.status(404).json({ error: 'Group not found' });
+        if (!group) return res.status(404).json({ error: 'A csoport nem található.' });
 
         const existing = await Match.findOne({ groupId: group._id, round: 'group' });
         if (existing) return res.status(409).json({ error: 'Group matches already generated for this group' });
 
         const category = await Category.findById(group.categoryId).lean();
-        if (!category) return res.status(404).json({ error: 'Category not found' });
+        if (!category) return res.status(404).json({ error: 'A kategória nem található.' });
 
         const n = group.players.length;
-        if (n < 2) return res.status(400).json({ error: 'Need at least 2 players in group' });
+        if (n < 2) return res.status(400).json({ error: 'Egy csoportban legalább 2 játékos szükséges.' });
 
         const requested = Number(req.body?.matchesPerPlayer);
         const cfg = Number(category.groupStageMatchesPerPlayer);
@@ -202,13 +214,14 @@ router.post('/group/:groupId', async (req, res) => {
 
 
 router.patch('/:matchId/umpire', async (req, res) => {
-    const { match } = await loadOwnedMatch(req.params.matchId, req.user._id);
-    if (!match) return res.status(404).json({ error: 'Match not found' });
-    if (match.voided) return res.status(409).json({ error: 'Cannot assign umpire to a voided match' });
+    const { match, tournament } = await loadOwnedMatch(req.params.matchId, req.user._id);
+    if (!match) return res.status(404).json({ error: 'A meccs nem található.' });
+    if (!ensureTournamentAllowsMatchChanges(tournament, res)) return;
+    if (match.voided) return res.status(409).json({ error: 'Érvénytelenített meccshez nem rendelhető játékvezető.' });
 
     const { umpireName = '' } = req.body ?? {};
     if (typeof umpireName !== 'string') {
-        return res.status(400).json({ error: 'umpireName must be a string' });
+        return res.status(400).json({ error: 'A játékvezető neve csak szöveg lehet.' });
     }
 
     const before = pickAuditFields(match, AUDIT_SNAPSHOT_FIELDS.match);
@@ -239,28 +252,65 @@ router.patch('/:matchId/umpire', async (req, res) => {
 
 router.patch('/:matchId/status', async (req, res) => {
     if (!req.is('application/json')) {
-        return res.status(400).json({ error: 'Content-Type must be application/json' });
+        return res.status(400).json({ error: 'A kérés Content-Type értékének application/json-nak kell lennie.' });
     }
     const { status } = req.body ?? {};
-    if (!status) return res.status(400).json({ error: 'Missing status in request body' });
+    if (!status) return res.status(400).json({ error: 'Hiányzik a státusz a kérés törzséből.' });
 
     if (!['pending', 'running'].includes(status)) {
-        return res.status(400).json({ error: 'status must be pending or running' });
+        return res.status(400).json({ error: 'A státusz csak várakozó vagy futó lehet.' });
     }
 
-    const { match } = await loadOwnedMatch(req.params.matchId, req.user._id);
-    if (!match) return res.status(404).json({ error: 'Match not found' });
+    const { match, tournament } = await loadOwnedMatch(req.params.matchId, req.user._id);
+    if (!match) return res.status(404).json({ error: 'A meccs nem található.' });
+    if (tournament?.status === 'finished') {
+        return res.status(409).json({ error: 'Lezárt versenynél a meccs státusza már nem módosítható.' });
+    }
 
-    if (match.voided) return res.status(409).json({ error: 'Cannot change status of a voided match' });
-    if (match.status === 'finished') return res.status(409).json({ error: 'Cannot change status of a finished match' });
+    if (match.voided) return res.status(409).json({ error: 'Érvénytelenített meccs státusza nem módosítható.' });
+    if (match.status === 'finished') return res.status(409).json({ error: 'Befejezett meccs státusza nem módosítható.' });
 
     if (status === 'running') {
-        if (match.status !== 'pending') return res.status(409).json({ error: 'Only pending can be started' });
+        if (match.status !== 'pending') return res.status(409).json({ error: 'Csak várakozó meccs indítható el.' });
+        if (!match.courtNumber || !match.startAt || !match.endAt) {
+            return res.status(409).json({ error: 'Csak beütemezett meccs indítható el: szükséges pálya és időpont.' });
+        }
+
+        const runningOnSameCourt = await Match.findOne({
+            _id: { $ne: match._id },
+            tournamentId: match.tournamentId,
+            status: 'running',
+            voided: { $ne: true },
+            courtNumber: match.courtNumber
+        }).lean();
+        if (runningOnSameCourt) {
+            return res.status(409).json({ error: `A(z) ${match.courtNumber}. pályán már fut egy másik meccs.` });
+        }
+
+        const runningWithSamePlayer = await Match.findOne({
+            _id: { $ne: match._id },
+            tournamentId: match.tournamentId,
+            status: 'running',
+            voided: { $ne: true },
+            $or: [
+                { player1: { $in: [match.player1, match.player2] } },
+                { player2: { $in: [match.player1, match.player2] } }
+            ]
+        }).lean();
+        if (runningWithSamePlayer) {
+            return res.status(409).json({ error: 'Az egyik játékos már egy másik futó meccsben szerepel.' });
+        }
+
         if (!match.actualStartAt) match.actualStartAt = new Date();
     }
 
-    if (status === 'pending' && ((match.sets?.length ?? 0) > 0 || match.winner)) {
-        return res.status(409).json({ error: 'Cannot revert to pending when result exists' });
+    if (status === 'pending') {
+        if ((match.sets?.length ?? 0) > 0 || match.winner) {
+            return res.status(409).json({ error: 'Rögzített eredmény mellett a meccs nem tehető vissza várakozó állapotba.' });
+        }
+        match.actualStartAt = null;
+        match.actualEndAt = null;
+        match.resultUpdatedAt = null;
     }
 
     const before = pickAuditFields(match, AUDIT_SNAPSHOT_FIELDS.match);
@@ -292,12 +342,12 @@ router.patch('/:matchId/status', async (req, res) => {
 router.patch('/:matchId/result', async (req, res) => {
     const { sets } = req.body ?? {};
 
-    const { match } = await loadOwnedMatch(req.params.matchId, req.user._id);
-    if (!match) return res.status(404).json({ error: 'Match not found' });
-    if (!ensureMatchResultEditable(match, res)) return;
+    const { match, tournament: ownedTournament } = await loadOwnedMatch(req.params.matchId, req.user._id);
+    if (!match) return res.status(404).json({ error: 'A meccs nem található.' });
 
     const { tournament, rules } = await loadOwnedTournamentMatchRules(match.tournamentId, req.user._id);
-    if (!tournament) return res.status(404).json({ error: 'Tournament not found for match' });
+    if (!tournament) return res.status(404).json({ error: 'A meccshez tartozó verseny nem található.' });
+    if (!ensureMatchResultEditable(match, ownedTournament, res)) return;
 
     const validation = validateMatchResult(sets, rules);
     if (!validation.ok) {
@@ -307,7 +357,7 @@ router.patch('/:matchId/result', async (req, res) => {
     const winner = determineMatchWinner(sets, match.player1, match.player2, rules);
     if (!winner) {
         return res.status(400).json({
-            error: `No winner determined (need ${Math.floor(rules.bestOf / 2) + 1} won set${rules.bestOf > 1 ? 's' : ''})`,
+            error: `Nem állapítható meg győztes (legalább ${Math.floor(rules.bestOf / 2) + 1} megnyert szett szükséges).`,
             rules
         });
     }
@@ -345,15 +395,15 @@ router.patch('/:matchId/result', async (req, res) => {
 router.patch('/:matchId/outcome', async (req, res) => {
     const { type, winnerSide } = req.body ?? {};
     if (!['wo', 'ff', 'ret'].includes(type)) {
-        return res.status(400).json({ error: 'type must be wo | ff | ret' });
+        return res.status(400).json({ error: 'Az eredménytípus csak wo, ff vagy ret lehet.' });
     }
     if (!['player1', 'player2'].includes(winnerSide)) {
-        return res.status(400).json({ error: 'winnerSide must be player1 | player2' });
+        return res.status(400).json({ error: 'A győztes oldala csak player1 vagy player2 lehet.' });
     }
 
-    const { match } = await loadOwnedMatch(req.params.matchId, req.user._id);
-    if (!match) return res.status(404).json({ error: 'Match not found' });
-    if (!ensureMatchResultEditable(match, res)) return;
+    const { match, tournament } = await loadOwnedMatch(req.params.matchId, req.user._id);
+    if (!match) return res.status(404).json({ error: 'A meccs nem található.' });
+    if (!ensureMatchResultEditable(match, tournament, res)) return;
 
     const winner = winnerSide === 'player1' ? match.player1 : match.player2;
     const before = pickAuditFields(match, AUDIT_SNAPSHOT_FIELDS.match);
@@ -388,12 +438,12 @@ router.patch('/:matchId/outcome', async (req, res) => {
 
 router.post('/group/:groupId/schedule', async (req, res) => {
     try {
-        if (!req.is('application/json')) return res.status(400).json({ error: 'Content-Type must be application/json' });
+        if (!req.is('application/json')) return res.status(400).json({ error: 'A kérés Content-Type értékének application/json-nak kell lennie.' });
         if (!req.body) return res.status(400).json({ error: 'Missing JSON body. Send Content-Type: application/json and a JSON payload.' });
 
         const { startAt, courtsCount, matchMinutes, playerRestMinutes, courtTurnoverMinutes, breakMinutes, force } = req.body;
         const parsedStart = startAt ? new Date(startAt) : new Date();
-        if (Number.isNaN(parsedStart.getTime())) return res.status(400).json({ error: 'Invalid startAt' });
+        if (Number.isNaN(parsedStart.getTime())) return res.status(400).json({ error: 'Érvénytelen kezdési időpont.' });
 
         const cCount = Number(courtsCount ?? 1);
         const mMin = Number(matchMinutes ?? 35);
@@ -406,13 +456,13 @@ router.post('/group/:groupId/schedule', async (req, res) => {
         if (!Number.isFinite(turnoverMin) || turnoverMin < 0 || turnoverMin > 120) return res.status(400).json({ error: 'courtTurnoverMinutes must be between 0 and 120' });
 
         const { group } = await loadOwnedGroup(req.params.groupId, req.user._id);
-        if (!group) return res.status(404).json({ error: 'Group not found' });
+        if (!group) return res.status(404).json({ error: 'A csoport nem található.' });
 
         const filter = { groupId: req.params.groupId, round: { $ne: 'friendly' }, status: 'pending', voided: { $ne: true } };
         if (!force) filter.startAt = null;
 
         const toSchedule = await Match.find(filter).select('_id player1 player2 round roundNumber createdAt').sort({ roundNumber: 1, createdAt: 1 }).lean();
-        if (toSchedule.length === 0) return res.json({ scheduled: 0, message: 'No matches to schedule with current filter' });
+        if (toSchedule.length === 0) return res.json({ scheduled: 0, message: 'Nincs beütemezhető meccs az aktuális szűrőkkel.' });
 
         const ids = new Set();
         toSchedule.forEach((m) => { ids.add(String(m.player1)); ids.add(String(m.player2)); });
@@ -420,7 +470,7 @@ router.post('/group/:groupId/schedule', async (req, res) => {
         const ok = new Set(players.filter((p) => p.checkedInAt && p.mainEligibility === 'main').map((p) => String(p._id)));
         const filtered = toSchedule.filter((m) => ok.has(String(m.player1)) && ok.has(String(m.player2)));
         if (filtered.length === 0) {
-            return res.json({ scheduled: 0, message: 'No schedulable matches: require both players checked-in and main-eligible' });
+            return res.json({ scheduled: 0, message: 'Nincs ütemezhető meccs: mindkét játékosnak check-inelve és main jogosultsággal kell rendelkeznie.' });
         }
 
         const plan = buildSchedule(filtered, {
@@ -461,12 +511,12 @@ router.post('/group/:groupId/schedule', async (req, res) => {
 router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
     try {
         const tournament = await Tournament.findOne({ _id: req.params.tournamentId, ownerId: req.user._id }).select('config status').lean();
-        if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
-        if (tournament.status === 'finished') return res.status(409).json({ error: 'Tournament finished' });
+        if (!tournament) return res.status(404).json({ error: 'A verseny nem található.' });
+        if (tournament.status === 'finished') return res.status(409).json({ error: 'A verseny már lezárt.' });
 
         const { startAt, courtsCount, matchMinutes, playerRestMinutes, breakMinutes, courtTurnoverMinutes, force = false, fairnessGap = 1 } = req.body ?? {};
         const parsedStart = startAt ? new Date(startAt) : new Date();
-        if (Number.isNaN(parsedStart.getTime())) return res.status(400).json({ error: 'Invalid startAt' });
+        if (Number.isNaN(parsedStart.getTime())) return res.status(400).json({ error: 'Érvénytelen kezdési időpont.' });
 
         const cfg = tournament.config ?? {};
         const cCount = Number(courtsCount ?? cfg.courtsCount ?? 1);
@@ -489,7 +539,7 @@ router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
             .sort({ categoryId: 1, roundNumber: 1, createdAt: 1 })
             .lean();
 
-        if (toSchedule.length === 0) return res.json({ scheduled: 0, message: 'No matches to schedule with current filter' });
+        if (toSchedule.length === 0) return res.json({ scheduled: 0, message: 'Nincs beütemezhető meccs az aktuális szűrőkkel.' });
 
         const playerIds = new Set();
         toSchedule.forEach((m) => { playerIds.add(String(m.player1)); playerIds.add(String(m.player2)); });
@@ -497,7 +547,7 @@ router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
         const okPlayers = new Set(players.filter((p) => p.checkedInAt && p.mainEligibility === 'main').map((p) => String(p._id)));
         const filtered = toSchedule.filter((m) => okPlayers.has(String(m.player1)) && okPlayers.has(String(m.player2)));
         if (filtered.length === 0) {
-            return res.json({ scheduled: 0, message: 'No schedulable matches: require both players checked-in and main-eligible' });
+            return res.json({ scheduled: 0, message: 'Nincs ütemezhető meccs: mindkét játékosnak check-inelve és main jogosultsággal kell rendelkeznie.' });
         }
 
         const scheduledIds = filtered.map((m) => m._id);
@@ -560,7 +610,7 @@ router.patch('/group/:groupId/schedule/reset', async (req, res) => {
     try {
         const groupId = req.params.groupId;
         const { group } = await loadOwnedGroup(groupId, req.user._id);
-        if (!group) return res.status(404).json({ error: 'Group not found' });
+        if (!group) return res.status(404).json({ error: 'A csoport nem található.' });
 
         const filter = { groupId, round: 'group', status: 'pending', voided: { $ne: true } };
         const result = await Match.updateMany(filter, { $set: { startAt: null, endAt: null, courtNumber: null } });

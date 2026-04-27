@@ -1,9 +1,9 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useRef, useState } from 'react';
 import { BackLink, PageHeader } from '../components/PageHeader.jsx';
 import { SectionCard } from '../components/SectionCard.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { api } from '../services/api.js';
-import { formatDateTime } from '../services/formatters.jsx';
 
 function formatTime(isoString) {
   if (!isoString) return '—';
@@ -63,7 +63,7 @@ export function BoardPage({ params }) {
   const running = board.runningMatches ?? [];
   const upcoming = board.upcomingMatches ?? [];
 
-  // Group upcoming by court for easier reading
+  // A következő meccseket pályánként csoportosítjuk, hogy a kijelző könnyebben áttekinthető legyen.
   const upcomingByCourt = upcoming.reduce((acc, match) => {
     const key = match.courtNumber ? `${match.courtNumber}. pálya` : 'Pálya nélkül';
     acc[key] = acc[key] ?? [];
@@ -75,7 +75,7 @@ export function BoardPage({ params }) {
     <div className="stack-xl">
       <BackLink to={`/tournaments/${id}`}>Vissza a versenyhez</BackLink>
       <PageHeader
-        eyebrow="Board"
+        eyebrow="Kijelző"
         title="Kijelzős nézet"
         description="A futó és a következőként betervezett meccsek gyors áttekintése. Az oldal 30 másodpercenként automatikusan frissül."
         action={

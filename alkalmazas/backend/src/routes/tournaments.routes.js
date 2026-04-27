@@ -6,6 +6,7 @@ import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '..
 
 const router = Router();
 
+// Új verseny létrehozása a normalizált konfiguráció alapján.
 router.post('/', async (req, res) => {
     try {
         const payload = normalizeTournamentPayload(req.body ?? {}, { partial: false });
@@ -34,16 +35,17 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
     const t = await assertTournamentOwned(req.params.id, req.user._id);
-    if (!t) return res.status(404).json({ error: 'Tournament not found' });
+    if (!t) return res.status(404).json({ error: 'A verseny nem található.' });
     res.json(t);
 });
 
+// Meglévő, még nem indított verseny módosítása.
 router.patch('/:id', async (req, res) => {
     const t = await assertTournamentOwned(req.params.id, req.user._id);
-    if (!t) return res.status(404).json({ error: 'Tournament not found' });
+    if (!t) return res.status(404).json({ error: 'A verseny nem található.' });
 
     if (t.status !== 'draft') {
-        return res.status(409).json({ error: 'Tournament is not editable unless status=draft' });
+        return res.status(409).json({ error: 'A verseny csak tervezet állapotban szerkeszthető.' });
     }
 
     try {
@@ -71,14 +73,15 @@ router.patch('/:id', async (req, res) => {
 
 router.post('/:id/start', async (req, res) => {
     const t = await assertTournamentOwned(req.params.id, req.user._id);
-    if (!t) return res.status(404).json({ error: 'Tournament not found' });
+    if (!t) return res.status(404).json({ error: 'A verseny nem található.' });
 
     if (t.status !== 'draft') {
-        return res.status(409).json({ error: 'Only draft tournament can be started' });
+        return res.status(409).json({ error: 'Csak tervezet állapotú verseny indítható el.' });
     }
 
     const before = pickAuditFields(t, AUDIT_SNAPSHOT_FIELDS.tournament);
     t.status = 'running';
+    t.finishedResultEditUnlocked = false;
     await t.save();
 
     await safeRecordAuditEvent({
@@ -97,14 +100,15 @@ router.post('/:id/start', async (req, res) => {
 
 router.post('/:id/finish', async (req, res) => {
     const t = await assertTournamentOwned(req.params.id, req.user._id);
-    if (!t) return res.status(404).json({ error: 'Tournament not found' });
+    if (!t) return res.status(404).json({ error: 'A verseny nem található.' });
 
     if (t.status !== 'running') {
-        return res.status(409).json({ error: 'Only running tournament can be finished' });
+        return res.status(409).json({ error: 'Csak futó verseny zárható le.' });
     }
 
     const before = pickAuditFields(t, AUDIT_SNAPSHOT_FIELDS.tournament);
     t.status = 'finished';
+    t.finishedResultEditUnlocked = false;
     await t.save();
 
     await safeRecordAuditEvent({
@@ -114,6 +118,35 @@ router.post('/:id/finish', async (req, res) => {
         entityId: t._id,
         action: 'tournament.finished',
         summary: `Tournament finished: ${t.name}`,
+        before,
+        after: pickAuditFields(t, AUDIT_SNAPSHOT_FIELDS.tournament)
+    });
+
+    res.json(t);
+});
+
+router.patch('/:id/finished-edit-lock', async (req, res) => {
+    const t = await assertTournamentOwned(req.params.id, req.user._id);
+    if (!t) return res.status(404).json({ error: 'A verseny nem található.' });
+
+    if (t.status !== 'finished') {
+        return res.status(409).json({ error: 'Csak lezárt versenynél kezelhető az eredményjavítás feloldása.' });
+    }
+
+    const unlocked = req.body?.unlocked === true;
+    const before = pickAuditFields(t, AUDIT_SNAPSHOT_FIELDS.tournament);
+    t.finishedResultEditUnlocked = unlocked;
+    await t.save();
+
+    await safeRecordAuditEvent({
+        userId: req.user._id,
+        tournamentId: t._id,
+        entityType: 'tournament',
+        entityId: t._id,
+        action: unlocked ? 'tournament.finished_edit_unlocked' : 'tournament.finished_edit_locked',
+        summary: unlocked
+            ? `Finished result editing unlocked: ${t.name}`
+            : `Finished result editing locked: ${t.name}`,
         before,
         after: pickAuditFields(t, AUDIT_SNAPSHOT_FIELDS.tournament)
     });

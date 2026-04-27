@@ -101,7 +101,7 @@ export function StandingsPage({ params }) {
           {!loading && groups.map((group) => {
             const standings = standingsByGroup[group._id] ?? [];
             return (
-              <SectionCard key={group._id} title={group.name} subtitle={`${standings.length} játékos a tabellában`} action={<AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${categoryId}/playoff`}>Playoff</AppLink>}>
+              <SectionCard key={group._id} title={group.name} subtitle={`${standings.length} játékos a tabellában`} action={<AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${categoryId}/playoff`}>Rájátszás</AppLink>}>
                 <table className="data-table">
                   <thead>
                     <tr>

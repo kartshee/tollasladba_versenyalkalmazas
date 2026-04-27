@@ -67,7 +67,7 @@ export function AppLayout({ children }) {
           <div className="sidebar__section">
             <div className="sidebar__section-title">Főmenü</div>
             <nav className="sidebar__nav">
-              <NavLink to="/" label="Dashboard" icon="⊞" />
+              <NavLink to="/" label="Főoldal" icon="⊞" />
               <NavLink to="/tournaments/new" label="Új verseny" icon="+" />
             </nav>
           </div>
@@ -83,10 +83,10 @@ export function AppLayout({ children }) {
                   <NavLink to={`/tournaments/${ctx.tournamentId}/categories`} label="Kategóriák" icon="⊟" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/entries`} label="Nevezések" icon="☰" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/payments`} label="Befizetések" icon="$" />
-                  <NavLink to={`/tournaments/${ctx.tournamentId}/checkin`} label="Check-in" icon="✓" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}/checkin`} label="Jelenlét" icon="✓" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/matches`} label="Meccsek" icon="⚡" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/schedule`} label="Ütemezés" icon="◷" />
-                  <NavLink to={`/tournaments/${ctx.tournamentId}/board`} label="Board" icon="▣" />
+                  <NavLink to={`/tournaments/${ctx.tournamentId}/board`} label="Kijelző" icon="▣" />
                   <NavLink to={`/tournaments/${ctx.tournamentId}/admin`} label="Export / Napló" icon="↓" />
                 </nav>
               </div>
@@ -106,12 +106,12 @@ export function AppLayout({ children }) {
                       />
                       <NavLink
                         to={`/tournaments/${ctx.tournamentId}/categories/${ctx.categoryId}/standings`}
-                        label="Standings"
+                        label="Tabella"
                         icon="≡"
                       />
                       <NavLink
                         to={`/tournaments/${ctx.tournamentId}/categories/${ctx.categoryId}/playoff`}
-                        label="Playoff"
+                        label="Rájátszás"
                         icon="⊳"
                       />
                     </nav>

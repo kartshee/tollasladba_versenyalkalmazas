@@ -44,7 +44,7 @@ export function DashboardPage() {
   return (
     <div className="stack-xl">
       <PageHeader
-        eyebrow="Dashboard"
+        eyebrow="Főoldal"
         title="Saját versenyek"
         description="A főoldalról gyorsan áttekinthető, melyik verseny milyen állapotban van, és innen érhető el minden fontos adminisztrációs folyamat."
         action={<AppLink className="button button--primary" to="/tournaments/new">Új verseny</AppLink>}

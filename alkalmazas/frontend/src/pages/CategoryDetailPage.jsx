@@ -6,7 +6,7 @@ import { StatCard } from '../components/StatCard.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
-
+import { formatCategoryFormat, formatStatusLabel } from '../services/formatters.jsx';
 
 function unresolvedPolicyLabel(v) {
   if (v === 'shared_place') return 'Közös helyezés';
@@ -70,8 +70,8 @@ export function CategoryDetailPage({ params }) {
       {error ? <div className="alert alert--error">{error}</div> : null}
 
       <div className="stats-grid">
-        <StatCard label="Formátum" value={category.format} />
-        <StatCard label="Állapot" value={category.status} />
+        <StatCard label="Formátum" value={formatCategoryFormat(category.format)} />
+        <StatCard label="Állapot" value={formatStatusLabel(category.status)} />
         <StatCard label="Továbbjutók" value={category.qualifiersPerGroup} />
         <StatCard label="Playoff méret" value={category.playoffSize ?? '-'} />
       </div>
@@ -89,7 +89,7 @@ export function CategoryDetailPage({ params }) {
                 <span>Csoportállás, holtverseny állapot és közös helyezés jelzések.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/categories/${categoryId}/playoff`}>
-                <strong>Playoff</strong>
+                <strong>Rájátszás</strong>
                 <span>Ágrajz nézet, bronzmeccs és továbbjutás követése.</span>
               </AppLink>
               <AppLink className="quick-link" to={`/tournaments/${id}/matches`}>
@@ -118,11 +118,11 @@ export function CategoryDetailPage({ params }) {
             <div className="key-value-list">
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Formátum</span>
-                <span className="key-value-list__value">{category.format}</span>
+                <span className="key-value-list__value">{formatCategoryFormat(category.format)}</span>
               </div>
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Állapot</span>
-                <span className="key-value-list__value"><StatusBadge>{category.status}</StatusBadge></span>
+                <span className="key-value-list__value"><StatusBadge>{formatStatusLabel(category.status)}</StatusBadge></span>
               </div>
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Csoportok</span>

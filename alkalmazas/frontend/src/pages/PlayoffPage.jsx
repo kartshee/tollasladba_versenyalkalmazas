@@ -170,8 +170,8 @@ export function PlayoffPage({ params }) {
     <div className="stack-xl">
       <BackLink to={`/tournaments/${id}/categories/${categoryId}`}>Vissza a kategóriához</BackLink>
       <PageHeader
-        eyebrow="Playoff"
-        title="Playoff és bronzmeccs"
+        eyebrow="Rájátszás"
+        title="Rájátszás és bronzmérkőzés"
         description="A playoff nézet a kategória teljes kieséses ágát mutatja. Innen generálható és továbbvihető az ágrajz, valamint gyorsan ellenőrizhető a döntő és a bronzmeccs állapota."
         action={category ? <StatusBadge tone={toneForStatus(category.status)}>{formatStatusLabel(category.status)}</StatusBadge> : null}
       />
@@ -183,7 +183,7 @@ export function PlayoffPage({ params }) {
           {loading ? <SectionCard title="Betöltés"><div className="muted">Playoff adatok betöltése...</div></SectionCard> : null}
 
           {!loading && category?.format === 'playoff' ? (
-            <SectionCard title="Playoff-only kategória" subtitle="Az ágrajz csoportkör nélkül indul.">
+            <SectionCard title="Csak egyenes kieséses kategória" subtitle="Az ágrajz csoportkör nélkül indul.">
               {playoffOnlyMatches.length === 0 ? (
                 <div className="muted">Ehhez a kategóriához még nincs sorsolás.</div>
               ) : (
@@ -253,7 +253,7 @@ export function PlayoffPage({ params }) {
               <div className="key-value-list__row"><span className="key-value-list__label">Összes playoff meccs</span><span className="key-value-list__value">{summary.total}</span></div>
               <div className="key-value-list__row"><span className="key-value-list__label">Várakozó</span><span className="key-value-list__value">{summary.pending}</span></div>
               <div className="key-value-list__row"><span className="key-value-list__label">Fut</span><span className="key-value-list__value">{summary.running}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Finished</span><span className="key-value-list__value">{summary.finished}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Befejezett</span><span className="key-value-list__value">{summary.finished}</span></div>
             </div>
           </SectionCard>
 

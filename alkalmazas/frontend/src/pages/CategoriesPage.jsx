@@ -5,6 +5,7 @@ import { SectionCard } from '../components/SectionCard.jsx';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
+import { formatCategoryFormat, formatStatusLabel } from '../services/formatters.jsx';
 
 export function CategoriesPage({ params }) {
   const { id } = params;
@@ -64,11 +65,11 @@ export function CategoriesPage({ params }) {
                   {categories.map((category) => (
                     <tr key={category._id}>
                       <td>{category.name}</td>
-                      <td>{category.format}</td>
+                      <td>{formatCategoryFormat(category.format)}</td>
                       <td>{category.groupsCount}</td>
                       <td>{category.qualifiersPerGroup}</td>
                       <td>{category.playoffSize ?? '-'}</td>
-                      <td><StatusBadge>{category.status}</StatusBadge></td>
+                      <td><StatusBadge>{formatStatusLabel(category.status)}</StatusBadge></td>
                       <td>
                         <div className="inline-actions">
                           <AppLink className="button button--ghost" to={`/tournaments/${id}/categories/${category._id}`}>Megnyitás</AppLink>
@@ -86,7 +87,7 @@ export function CategoriesPage({ params }) {
         <aside className="page-grid__side aside-stack">
           <SectionCard title="Mit kezelsz itt?">
             <ul className="bullet-list">
-              <li>A kategória formátumát: group, group+playoff vagy playoff.</li>
+              <li>A kategória formátumát: csoportkör, csoportkör + rájátszás vagy egyenes kiesés.</li>
               <li>A továbbjutók számát és a playoff méretét.</li>
               <li>A holtverseny szabály és egyéb lebonyolítási szabályokat.</li>
             </ul>

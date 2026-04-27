@@ -6,7 +6,7 @@ import { StatusBadge } from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
 import { AppLink } from '../components/AppLink.jsx';
-import { formatCurrency, formatStatusLabel, toneForStatus, normalizeSearch } from '../services/formatters.jsx';
+import { formatCurrency, normalizeSearch } from '../services/formatters.jsx';
 
 const emptyEntryForm = {
   feeAmount: '',
@@ -254,7 +254,7 @@ export function EntriesPage({ params }) {
                   <th>Klub</th>
                   <th>Fizetett</th>
                   <th>Összeg</th>
-                  <th>Payment group</th>
+                  <th>Fizetési csoport</th>
                   <th>Művelet</th>
                 </tr>
               </thead>
@@ -325,7 +325,7 @@ export function EntriesPage({ params }) {
                 <FormField label="Díjösszeg" htmlFor="entry-fee-amount">
                   <input id="entry-fee-amount" type="number" min="0" step="100" value={entryForm.feeAmount} onChange={(e) => setEntryForm((state) => ({ ...state, feeAmount: e.target.value }))} />
                 </FormField>
-                <FormField label="Payment group" htmlFor="entry-payment-group" hintText="Ha egy klub vagy csapat egyben fizeti a nevezéseket, itt rendelhető a nevezés egy közös fizetési csoporthoz.">
+                <FormField label="Fizetési csoport" htmlFor="entry-payment-group" hintText="Ha egy klub vagy csapat egyben fizeti a nevezéseket, itt rendelhető a nevezés egy közös fizetési csoporthoz.">
                   <select id="entry-payment-group" value={entryForm.paymentGroupId} onChange={(e) => setEntryForm((state) => ({ ...state, paymentGroupId: e.target.value }))}>
                     <option value="">Nincs hozzárendelve</option>
                     {paymentGroups.map((group) => <option key={group._id} value={group._id}>{group.payerName}</option>)}
@@ -366,7 +366,7 @@ export function EntriesPage({ params }) {
                 <input type="checkbox" checked={paymentForm.paid} onChange={(e) => setPaymentForm((state) => ({ ...state, paid: e.target.checked }))} />
                 <span>Fizetve</span>
               </label>
-              <button className="button button--secondary button--block" type="submit" disabled={submitting}>Payment group létrehozása</button>
+              <button className="button button--secondary button--block" type="submit" disabled={submitting}>Fizetési csoport létrehozása</button>
             </form>
           </SectionCard>
         </aside>

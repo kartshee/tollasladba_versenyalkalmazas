@@ -51,8 +51,20 @@ app.use('/api/exports', exportRoutes);
 app.use('/api/entries', entryRoutes);
 app.use('/api/payment-groups', paymentRoutes);
 
+
 app.get('/health', (req, res) => {
     res.json({ ok: true, dbReadyState: mongoose.connection.readyState });
+});
+
+// Egységes fallback választ ad az ismeretlen végpontokra.
+app.use((req, res) => {
+    res.status(404).json({ error: 'A kért végpont nem található.' });
+});
+
+// Utolsó védőháló a nem kezelt szerverhibákhoz.
+app.use((err, req, res, next) => {
+    console.error(err);
+    res.status(err?.status || 500).json({ error: 'Váratlan szerverhiba történt.' });
 });
 
 export default app;

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 import { useEffect, useMemo, useState } from 'react';
 import { BackLink, PageHeader } from '../components/PageHeader.jsx';
 import { SectionCard } from '../components/SectionCard.jsx';
@@ -11,6 +12,8 @@ const ACTION_LABELS = {
   'tournament.updated': 'Verseny módosítva',
   'tournament.started': 'Verseny elindítva',
   'tournament.finished': 'Verseny lezárva',
+  'tournament.finished_edit_unlocked': 'Eredményjavítás feloldva',
+  'tournament.finished_edit_locked': 'Eredményjavítás visszazárva',
   'category.created': 'Kategória létrehozva',
   'category.updated': 'Kategória módosítva',
   'category.draw_finalized': 'Draw lezárva',

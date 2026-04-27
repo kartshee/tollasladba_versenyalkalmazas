@@ -106,7 +106,7 @@ export function CheckinPage({ params }) {
     <div className="stack-xl">
       <BackLink to={`/tournaments/${id}`}>Vissza a versenyhez</BackLink>
       <PageHeader
-        eyebrow="Check-in"
+        eyebrow="Jelenlét"
         title="Jelenlét és sorsolás előkészítése"
         description="A verseny napján ez az egyik fő operatív oldal: itt dől el, hogy kik a tényleges indulók, és innen indítható a sorsolás lezárása is."
       />
@@ -168,7 +168,7 @@ export function CheckinPage({ params }) {
                       <td>{player.note || '—'}</td>
                       <td>
                         <button className="button button--ghost" type="button" onClick={() => toggleCheckin(player, !player.checkedInAt)}>
-                          {player.checkedInAt ? 'Check-out' : 'Check-in'}
+                          {player.checkedInAt ? 'Jelenlét visszavonása' : 'Jelenlét jelölése'}
                         </button>
                       </td>
                     </tr>
@@ -183,10 +183,10 @@ export function CheckinPage({ params }) {
         </div>
 
         <aside className="page-grid__side aside-stack">
-          <SectionCard title="Check-in összesítő" subtitle={tournament?.name ?? 'Verseny összesítés'}>
+          <SectionCard title="Jelenléti összesítő" subtitle={tournament?.name ?? 'Verseny összesítés'}>
             <div className="key-value-list">
               <div className="key-value-list__row"><span className="key-value-list__label">Összes játékos</span><span className="key-value-list__value">{summary.total}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Check-inelve</span><span className="key-value-list__value">{summary.checkedIn}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Jelen van</span><span className="key-value-list__value">{summary.checkedIn}</span></div>
               <div className="key-value-list__row"><span className="key-value-list__label">Hiányzók</span><span className="key-value-list__value">{summary.missing}</span></div>
             </div>
           </SectionCard>
