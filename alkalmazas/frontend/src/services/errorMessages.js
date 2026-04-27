@@ -58,7 +58,37 @@ const DIRECT_MESSAGE_MAP = {
   'Players must belong to this category (MVP)': 'A játékosoknak ebbe a kategóriába kell tartozniuk.',
   'Cannot update players after draw is locked': 'A játékosok már nem módosíthatók a sorsolás lezárása után.',
   'A kért végpont nem található.': 'A kért végpont nem található.',
-  'Váratlan szerverhiba történt.': 'Váratlan szerverhiba történt.'
+  'Váratlan szerverhiba történt.': 'Váratlan szerverhiba történt.',
+
+  // Kategória műveletek
+  'Name is required': 'A név megadása kötelező.',
+  'Group name is required': 'A csoport nevének megadása kötelező.',
+  'Category cannot be deleted while related players, groups or matches exist': 'A kategória nem törölhető, amíg játékosok, csoportok vagy meccsek tartoznak hozzá.',
+  'Category does not belong to tournament': 'A kategória nem tartozik ehhez a versenyhez.',
+  'Category format does not allow playoff generation': 'A kategória formátuma nem támogatja a rájátszás generálását.',
+  'Category already locked/in progress': 'A kategória sorsolása már le van zárva vagy folyamatban van.',
+  'Invalid graceMinutesOverride (0..240)': 'A türelmi idő felülbírálata 0 és 240 perc közé kell essen.',
+
+  // Csoport és rájátszás
+  'Duplicate playerId in group': 'Egy játékos nem szerepelhet többször ugyanabban a csoportban.',
+  'Player not in this group': 'A játékos nem tagja ennek a csoportnak.',
+  'Group stage not finished': 'A csoportkör még nem ért véget.',
+  'Playoff already generated for this group': 'Ehhez a csoporthoz a rájátszás már legenerálásra került.',
+  'Final not finished or not found': 'A döntő még nem ért véget, vagy nem található.',
+  'Unresolved tie at playoff cutoff. Provide overrideQualifiedPlayerIds or resolve manually.': 'Feloldatlan holtverseny a továbbjutási határon. Add meg az overrideQualifiedPlayerIds listát, vagy oldd fel kézzel.',
+  'Unsupported qualifiersPerGroup. Supported values: 2, 4, 8, 16, 32': 'Nem támogatott továbbjutók száma csoportonként. Megengedett értékek: 2, 4, 8, 16, 32.',
+
+  // Játékosok
+  'One or more players belong to another tournament': 'Egy vagy több játékos már egy másik versenyhez tartozik.',
+  'One or more players not found': 'Egy vagy több játékos nem található.',
+  'players must be an array': 'A játékosokat tömbként kell megadni.',
+
+  // Jelenlét és egyéb mezők
+  'checkedIn must be true or false': 'A jelenlét mező értéke csak igaz vagy hamis lehet.',
+  'Invalid reason': 'Érvénytelen indoklás.',
+
+  // Protokoll hibák
+  'Missing JSON body. Send Content-Type: application/json and a JSON payload.': 'Hiányzó kéréstörzs. Kérlek, JSON formátumban küldd el az adatokat.',
 };
 
 function humanizeFieldName(fieldName) {
@@ -124,6 +154,8 @@ export function translateApiErrorMessage(rawMessage, status) {
   if (/^Too many sets provided/.test(message)) return 'Túl sok szett lett megadva a meccs lezárásához.';
   if (/^config\./.test(message)) return message.replace(/^config\./, 'A beállítás ').replace(/must be/g, 'értéke legyen').replace(/required/g, 'megadása kötelező');
   if (/^A\(z\) \d+\. pályán már fut egy másik meccs\.$/.test(message)) return message;
+
+  if (/^Category already locked\/in progress/.test(message)) return 'A kategória sorsolása már le van zárva vagy folyamatban van.';
 
   return message;
 }
