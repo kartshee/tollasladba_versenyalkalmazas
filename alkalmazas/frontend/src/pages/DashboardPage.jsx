@@ -94,7 +94,7 @@ export function DashboardPage() {
         </div>
 
         <aside className="page-grid__side aside-stack">
-          <SectionCard title="Gyors műveletek" subtitle="A leggyakoribb admin feladatok egy helyen.">
+          <SectionCard title="Gyors műveletek" subtitle="Új verseny létrehozása és a meglévők megnyitása.">
             <div className="stack-md">
               <AppLink className="quick-link" to="/tournaments/new">
                 <strong>Új verseny létrehozása</strong>
@@ -118,14 +118,6 @@ export function DashboardPage() {
                 <span className="key-value-list__value">{grouped.finished.length}</span>
               </div>
             </div>
-          </SectionCard>
-
-          <SectionCard title="Használati elv" subtitle="A dashboard célja a gyors eligazodás, nem a túlterhelt grafikai megjelenítés.">
-            <ul className="bullet-list">
-              <li>Minden fontos funkció 1-2 kattintásból elérhető legyen.</li>
-              <li>A legfontosabb versenynapi műveletek külön oldalon jelenjenek meg.</li>
-              <li>A veszélyes műveletek mindig elkülönüljenek a normál admin funkcióktól.</li>
-            </ul>
           </SectionCard>
         </aside>
       </div>

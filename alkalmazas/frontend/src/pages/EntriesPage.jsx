@@ -198,7 +198,7 @@ export function EntriesPage({ params }) {
 
       <div className="page-grid">
         <div className="page-grid__main stack-lg">
-          <SectionCard title="Szűrés és gyors felvétel" subtitle="Frontend teszthez és adminisztrációhoz is ez a legfontosabb belépési pont.">
+          <SectionCard title="Szűrés és gyors felvétel" subtitle="Játékosok keresése, szűrése és fizetési adatok kezelése.">
             <div className="two-column-grid">
               <form className="stack-md" onSubmit={handleCreatePlayer}>
                 <div className="section-card__title-row"><h3>Új játékos felvétele</h3></div>

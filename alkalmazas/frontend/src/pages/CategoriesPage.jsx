@@ -85,13 +85,6 @@ export function CategoriesPage({ params }) {
         </div>
 
         <aside className="page-grid__side aside-stack">
-          <SectionCard title="Mit kezelsz itt?">
-            <ul className="bullet-list">
-              <li>A kategória formátumát: csoportkör, csoportkör + rájátszás vagy egyenes kiesés.</li>
-              <li>A továbbjutók számát és a playoff méretét.</li>
-              <li>A holtverseny szabály és egyéb lebonyolítási szabályokat.</li>
-            </ul>
-          </SectionCard>
 
           <SectionCard title="Gyors összesítő">
             <div className="key-value-list">

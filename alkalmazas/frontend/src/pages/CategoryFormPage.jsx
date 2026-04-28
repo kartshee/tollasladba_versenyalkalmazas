@@ -20,6 +20,74 @@ const initialForm = {
   unresolvedTiePolicy: 'shared_place',
 };
 
+function HowItWorks({ open, onToggle }) {
+  return (
+    <div className={`howto-block${open ? ' howto-block--open' : ''}`}>
+      <button className="howto-block__toggle" type="button" onClick={onToggle}>
+        <span>Hogyan működnek a kategória beállítások?</span>
+        <span className="howto-block__chevron">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="howto-block__body">
+          <p>
+            Egy kategória önálló lebonyolítási egység a versenyen belül – például „Felnőtt férfi egyes" vagy „Vegyes páros U18".
+            Minden kategóriának saját sorsolása, meccslistája és tabellája van.
+          </p>
+
+          <h4>Lebonyolítási formátumok</h4>
+          <p>
+            <strong>Csoportkör:</strong> a játékosok kis csoportokban körmérkőzéses alapon játszanak egymással. A végeredmény
+            a tabellán látható, de nincs külön rájátszás. Akkor érdemes, ha a helyezés a cél, nem a bajnok kiemelése.
+          </p>
+          <p>
+            <strong>Csoportkör + rájátszás:</strong> a leggyakoribb forma. Először csoportkör, majd a csoportokból
+            a legjobb n játékos egyenes kieséses táblán méri össze tudását. A továbbjutók száma csoportonként beállítható.
+          </p>
+          <p>
+            <strong>Egyenes kiesés:</strong> nincs csoportkör, a sorsolás egyből playoff táblát hoz létre.
+            A rendszer pontosan annyi játékost vár, amennyi a táblaméret (pl. 8 vagy 16 fő).
+          </p>
+
+          <h4>Csonka round robin (részleges körmérkőzés)</h4>
+          <p>
+            Ha egy csoportban sok a játékos, a teljes körmérkőzés (mindenki mindenkivel) túl sok meccset eredményezne.
+            A <em>meccsek száma játékosonként</em> beállítással ez korlátozható: például 10 fős csoportban 4-es értékkel
+            mindenki csak 4 meccset játszik a lehetséges 9 helyett. A rendszer véletlenszerűen generálja a párokat,
+            figyelve az egyenletes elosztásra.
+          </p>
+
+          <h4>Walkover (WO), feladás (FF) és sérülés (RET)</h4>
+          <p>
+            Ha egy játékos nem jelenik meg a meccsre, a meccset <strong>walkoverként (WO)</strong> lehet lezárni –
+            a megjelent játékos kap győzelmet, de szetteredmény nem kerül rögzítésre.
+            <strong> Feladás (FF)</strong> esetén a meccs elindult, de az egyik fél játék közben visszalépett.
+            <strong> Sérülés (RET)</strong> a meccs közbeni kényszermegállást jelenti. Mindhárom esetben győztest
+            kell jelölni, és a tabellaszámításban a rendszer külön kezeli ezeket a w.o. policy alapján.
+          </p>
+
+          <h4>Holtverseny (tie) feloldása</h4>
+          <p>
+            Ha két vagy több játékosnak azonos a győzelmi aránya a csoportkör végén, holtverseny keletkezik.
+            A feloldás menete:
+          </p>
+          <p>
+            <strong>1. Mini-tabella:</strong> csak az egymás elleni meccsek számítanak. Ha ez egyértelmű eredményt ad,
+            a sorrend meghatározódik.
+          </p>
+          <p>
+            <strong>2. Összes meccs statisztikája (ha engedélyezve van):</strong> ha a mini-tabella után is döntetlen
+            a helyzet, beleszámít a szett-különbség és a pont-különbség az összes csoportmeccsből.
+          </p>
+          <p>
+            <strong>3. Feloldhatatlan holtverseny:</strong> ha minden szempont után is azonos a két játékos,
+            vagy közös helyezést adunk (pl. mindkettő „2. hely"), vagy manuális döntést kérünk az adminisztrátortól.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function CategoryFormPage({ params }) {
   const { id, categoryId } = params;
   const auth = useAuth();
@@ -29,6 +97,7 @@ export function CategoryFormPage({ params }) {
   const [loading, setLoading] = useState(isEdit);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
     if (!isEdit) return undefined;
@@ -113,8 +182,10 @@ export function CategoryFormPage({ params }) {
       <PageHeader
         eyebrow={isEdit ? 'Kategória szerkesztése' : 'Új kategória'}
         title={isEdit ? 'Kategória szerkesztése' : 'Új kategória létrehozása'}
-        description="A kategória határozza meg a csoportkör, a továbbjutás és a playoff logikáját."
+        description="A kategória határozza meg a csoportkör, a továbbjutás és a rájátszás logikáját."
       />
+
+      <HowItWorks open={helpOpen} onToggle={() => setHelpOpen((v) => !v)} />
 
       <form className="stack-xl" onSubmit={handleSubmit}>
         <SectionCard title="Alapadatok">
@@ -124,10 +195,10 @@ export function CategoryFormPage({ params }) {
             </FormField>
             <FormField label="Nem" htmlFor="category-gender">
               <select id="category-gender" value={form.gender} onChange={(e) => update('gender', e.target.value)}>
-                <option value="male">férfi</option>
-                <option value="female">női</option>
-                <option value="mixed">vegyes</option>
-                <option value="other">egyéb</option>
+                <option value="male">Férfi</option>
+                <option value="female">Női</option>
+                <option value="mixed">Vegyes</option>
+                <option value="other">Egyéb</option>
               </select>
             </FormField>
             <FormField label="Korosztály" htmlFor="category-ageGroup">
@@ -138,57 +209,57 @@ export function CategoryFormPage({ params }) {
 
         <SectionCard title="Lebonyolítási forma">
           <div className="form-grid form-grid--two">
-            <FormField label="Formátum" htmlFor="category-format" hintText="A kategória lehet csak csoportkörös, csoportkörből playoffba vezető vagy eleve tisztán egyenes kieséses.">
+            <FormField label="Formátum" htmlFor="category-format" hintText="Válaszd ki a lebonyolítás módját. A súgóban részletes leírás olvasható mindhárom lehetőségről.">
               <select id="category-format" value={form.format} onChange={(e) => update('format', e.target.value)}>
-                <option value="group">group</option>
-                <option value="group+playoff">group+playoff</option>
-                <option value="playoff">playoff</option>
+                <option value="group">Csak csoportkör</option>
+                <option value="group+playoff">Csoportkör + rájátszás</option>
+                <option value="playoff">Csak egyenes kiesés</option>
               </select>
             </FormField>
             {form.format !== 'playoff' ? (
-              <FormField label="Csoportok száma" htmlFor="category-groupsCount" hintText="A sorsolás lezárásakor ennyi csoportot próbál létrehozni a rendszer. Ha 1, akkor egyetlen csoportban marad a mezőny.">
+              <FormField label="Csoportok száma" htmlFor="category-groupsCount" hintText="A sorsolás lezárásakor ennyi csoportot hoz létre a rendszer. Ha 1, akkor a teljes mezőny egyetlen csoportban játszik.">
                 <input id="category-groupsCount" type="number" min="1" max="32" value={form.groupsCount} onChange={(e) => update('groupsCount', e.target.value)} />
               </FormField>
             ) : null}
-            <FormField label="Csoportlétszám célérték" htmlFor="category-groupSizeTarget" hintText="A csoportkörös kategóriákban ez segíti a sorsolás felosztását és a továbbjutás logikájának tervezését.">
+            <FormField label="Csoportlétszám célérték" htmlFor="category-groupSizeTarget" hintText="A sorsolás ennyi fős csoportokat próbál kialakítani. Befolyásolja a továbbjutás tervezését.">
               <input id="category-groupSizeTarget" type="number" min="2" max="64" value={form.groupSizeTarget} onChange={(e) => update('groupSizeTarget', e.target.value)} />
             </FormField>
             {form.format !== 'playoff' ? (
-              <FormField label="Meccsek száma játékosonként" htmlFor="category-groupStageMatchesPerPlayer" hintText="Csonka round robin esetén ez határozza meg, hogy egy játékos hány csoportmeccset kapjon. Nagyobb mezőnynél így csökkenthető a teljes meccsszám.">
+              <FormField label="Meccsek száma játékosonként" htmlFor="category-groupStageMatchesPerPlayer" hintText="Csonka round robin: mindenki ennyi csoportmeccset kap. Nagy mezőnynél így csökkenthető a meccsszám anélkül, hogy valaki ki lenne zárva a körmérkőzésből.">
                 <input id="category-groupStageMatchesPerPlayer" type="number" min="1" max="100" value={form.groupStageMatchesPerPlayer} onChange={(e) => update('groupStageMatchesPerPlayer', e.target.value)} />
               </FormField>
             ) : null}
-            <FormField label="Továbbjutók száma" htmlFor="category-qualifiersPerGroup" hintText="Group+playoff esetben a csoportból ennyi játékos jut tovább a playoff ágra. A playoff mérete ehhez igazodik.">
+            <FormField label="Továbbjutók száma csoportonként" htmlFor="category-qualifiersPerGroup" hintText="Csoportkör + rájátszás esetén csoportonként ennyi játékos kerül a playoff táblára.">
               <input id="category-qualifiersPerGroup" type="number" min="1" max="32" value={form.qualifiersPerGroup} onChange={(e) => update('qualifiersPerGroup', e.target.value)} />
             </FormField>
             {form.format === 'playoff' ? (
-              <FormField label="Playoff méret" htmlFor="category-playoffSize" hintText="Playoff-only kategóriánál ez adja meg a teljes egyenes kieséses tábla méretét. A jelenlegi backend csak pontosan ekkora indulólétszámot fogad el.">
+              <FormField label="Playoff tábla mérete" htmlFor="category-playoffSize" hintText="Egyenes kieséses kategóriánál pontosan ennyi játékos indulhat. A sorsolás csak akkor fut le, ha a megfelelő számú játékos check-inelt.">
                 <select id="category-playoffSize" value={form.playoffSize} onChange={(e) => update('playoffSize', e.target.value)}>
-                  {[2,4,8,16,32].map((size) => <option key={size} value={size}>{size}</option>)}
+                  {[2, 4, 8, 16, 32].map((size) => <option key={size} value={size}>{size} fő</option>)}
                 </select>
               </FormField>
             ) : (
               <div className="readonly-field">
-                <span className="readonly-field__label">Playoff méret</span>
-                <strong>{effectivePlayoffSize ?? '-'}</strong>
-                <span className="readonly-field__help">Group+playoff esetén a playoff méret automatikusan a továbbjutók számából következik.</span>
+                <span className="readonly-field__label">Playoff tábla mérete</span>
+                <strong>{effectivePlayoffSize ?? '—'}</strong>
+                <span className="readonly-field__help">Csoportkör + rájátszás esetén automatikusan a továbbjutók számából következik.</span>
               </div>
             )}
           </div>
         </SectionCard>
 
-        <SectionCard title="Holtverseny szabály">
+        <SectionCard title="Holtverseny szabály" subtitle="Mi döntsön, ha két játékos teljesen azonos eredménnyel zárja a csoportkört?">
           <div className="form-grid form-grid--two">
-            <FormField label="Többfős holtverseny" htmlFor="category-multiTiePolicy" hintText="Beállítható, hogy több játékos holtversenyénél csak az egymás elleni mini-tabella számítson-e, vagy utána az összes meccs statisztikája is beleszóljon.">
+            <FormField label="Többfős holtverseny feloldása" htmlFor="category-multiTiePolicy" hintText="Mini-tabella (csak egymás elleni): ha a közvetlen meccsük egyértelmű eredményt ad, az dönt. Mini-tabella, majd összes meccs: ha a közvetlen meccs sem old fel, jön a szett- és pontkülönbség az összes meccsből.">
               <select id="category-multiTiePolicy" value={form.multiTiePolicy} onChange={(e) => update('multiTiePolicy', e.target.value)}>
-                <option value="direct_only">direct_only</option>
-                <option value="direct_then_overall">direct_then_overall</option>
+                <option value="direct_only">Csak közvetlen meccs (mini-tabella)</option>
+                <option value="direct_then_overall">Közvetlen meccs, majd összes statisztika</option>
               </select>
             </FormField>
-            <FormField label="Feloldhatatlan holtverseny" htmlFor="category-unresolvedTiePolicy" hintText="Ha minden sportszakmai szempont után is döntetlen marad a sorrend, akkor adható közös helyezés vagy szükséges manuális döntés.">
+            <FormField label="Feloldhatatlan holtverseny" htmlFor="category-unresolvedTiePolicy" hintText="Ha minden szempont után is azonos a sorrend, közös helyezést adhat a rendszer, vagy manuális döntést kérhet az adminisztrátortól.">
               <select id="category-unresolvedTiePolicy" value={form.unresolvedTiePolicy} onChange={(e) => update('unresolvedTiePolicy', e.target.value)}>
                 <option value="shared_place">Közös helyezés</option>
-                <option value="manual_override">manual_override</option>
+                <option value="manual_override">Manuális döntés szükséges</option>
               </select>
             </FormField>
           </div>
@@ -197,7 +268,9 @@ export function CategoryFormPage({ params }) {
         {error ? <div className="alert alert--error">{error}</div> : null}
 
         <div className="actions-row">
-          <button className="button button--primary" type="submit" disabled={submitting}>{submitting ? 'Mentés...' : isEdit ? 'Módosítás mentése' : 'Kategória létrehozása'}</button>
+          <button className="button button--primary" type="submit" disabled={submitting}>
+            {submitting ? 'Mentés...' : isEdit ? 'Módosítás mentése' : 'Kategória létrehozása'}
+          </button>
         </div>
       </form>
     </div>

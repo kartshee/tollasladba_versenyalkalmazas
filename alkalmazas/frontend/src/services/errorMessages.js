@@ -152,6 +152,10 @@ export function translateApiErrorMessage(rawMessage, status) {
   if (/^Set points must be numbers$/.test(message)) return 'A szettpontok csak számok lehetnek.';
   if (/^Invalid set score$/.test(message)) return 'Érvénytelen szetteredmény.';
   if (/^Too many sets provided/.test(message)) return 'Túl sok szett lett megadva a meccs lezárásához.';
+  if (/^Match must have between/.test(message)) {
+    const m = message.match(/between (\d+) and (\d+).*?bestOf=(\d+)/);
+    if (m) return `A meccsnek legalább ${m[1]} és legfeljebb ${m[2]} szettből kell állnia (best of ${m[3]}).`;
+  }
   if (/^config\./.test(message)) return message.replace(/^config\./, 'A beállítás ').replace(/must be/g, 'értéke legyen').replace(/required/g, 'megadása kötelező');
   if (/^A\(z\) \d+\. pályán már fut egy másik meccs\.$/.test(message)) return message;
 

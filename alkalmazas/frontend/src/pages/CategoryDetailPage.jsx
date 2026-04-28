@@ -135,11 +135,11 @@ export function CategoryDetailPage({ params }) {
             </div>
           </SectionCard>
 
-          <SectionCard title="Tervezett következő lépés">
+          <SectionCard title="Következő lépések">
             <ul className="bullet-list">
-              <li>Nevezések és check-in ellenőrzése.</li>
-              <li>Sorsolás lezárása.</li>
-              <li>Meccsek és tabella nyomon követése.</li>
+              <li>Ellenőrizd a nevezéseket és a check-in státuszokat.</li>
+              <li>Ha mindenki megérkezett, zárd le a sorsolást.</li>
+              <li>A sorsolás után a meccsek és a tabella a megfelelő oldalakon követhető.</li>
             </ul>
           </SectionCard>
         </aside>

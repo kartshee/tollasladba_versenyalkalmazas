@@ -135,7 +135,7 @@ export function ProfilePage() {
         <aside className="page-grid__side aside-stack">
           <SectionCard title="Biztonsági megjegyzések">
             <ul className="bullet-list">
-              <li>A jelszó biztonságosan tárolt – nem látható visszafejtve.</li>
+              <li>A jelszó titkosítva van tárolva.</li>
               <li>A jelszóváltoztatáshoz mindig szükséges a jelenlegi jelszó megadása.</li>
               <li>Legalább 6 karakteres jelszó szükséges.</li>
             </ul>

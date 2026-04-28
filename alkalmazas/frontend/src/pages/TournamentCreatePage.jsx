@@ -28,47 +28,70 @@ const initialForm = {
 
 function HowItWorks({ open, onToggle }) {
   return (
-    <div className={`howto-block${open ? ' howto-block--open' : ''}`}>
-      <button className="howto-block__toggle" type="button" onClick={onToggle}>
-        <span>Hogyan konfiguráljak versenyt?</span>
-        <span className="howto-block__chevron">{open ? '▲' : '▼'}</span>
-      </button>
-      {open && (
-        <div className="howto-block__body">
-          <p>
-            Ezen az oldalon a <strong>verseny globális kereteit</strong> állítod be – ezek az egész versenyre vonatkoznak,
-            nem kategóriánként értelmezendők.
-          </p>
-          <h4>Pályák és ütemezés</h4>
-          <p>
-            A <em>pályák száma</em> határozza meg, hány meccs futhat párhuzamosan. A <em>becsült meccsidő</em> és a
-            <em> pihenőidők</em> alapján a rendszer automatikusan oszt el meccseket, hogy ne kelljen kézzel ütemezni.
-            A check-in türelmi idő azt jelenti, hogy a meccs tervezett kezdete előtt hány perccel kell a játékosnak
-            megjelennie – ha nem jelent meg, a rendszer azt jelzi.
-          </p>
-          <h4>Meccsszabályok</h4>
-          <p>
-            A nyert szettek száma beállítás határozza meg, hány megnyert szettig tart egy meccs (például BO3 esetén az nyer, aki előbb 2 szettet nyer).
-            A <em>ponthatár</em> és <em>pontelőny</em> a szett végét szabja meg – tollaslabdában általában 21 pontig,
-            2 pontos előnnyel, 30-as plafonnal.
-          </p>
-          <h4>Kategóriák</h4>
-          <p>
-            A verseny létrehozása után <strong>kategóriákat</strong> kell felvenni (pl. Felnőtt férfi egyes, Vegyes
-            páros stb.). Kategóriánként külön lehet beállítani a formátumot (csoportkör, playoff, vegyes),
-            a csoportméretet és a továbbjutók számát. A meccsszabályokat is felül lehet bírálni kategóriánként.
-          </p>
-          <h4>Sorsolás és menetrend</h4>
-          <p>
-            A nevezések felvétele és a check-in után a <em>Sorsolás lezárása</em> gomb hozza létre a csoportokat és
-            generálja a meccseket. Ezután az ütemező automatikusan pályákhoz és időpontokhoz rendeli a meccseket –
-            ezt az <em>Ütemezés</em> oldalon lehet elindítani és finomhangolni.
-          </p>
-        </div>
-      )}
-    </div>
+      <div className={`howto-block${open ? ' howto-block--open' : ''}`}>
+        <button className="howto-block__toggle" type="button" onClick={onToggle}>
+          <span>Hogyan konfiguráljak versenyt?</span>
+          <span className="howto-block__chevron">{open ? '▲' : '▼'}</span>
+        </button>
+        {open && (
+            <div className="howto-block__body">
+              <p>
+                Ezen az oldalon a <strong>verseny globális kereteit</strong> állítod be – ezek az egész versenyre
+                vonatkoznak, nem kategóriánként értelmezendők.
+              </p>
+
+              <h4>A verseny életciklusa</h4>
+              <p>
+                Egy verseny három állapotot vesz fel. <strong>Tervezet</strong> állapotban szabadon szerkeszthető minden
+                beállítás, kategóriák és játékosok felvehetők. Amikor minden adat rendben van, a verseny
+                <em> elindítható</em> – ettől kezdve az alapadatok már nem módosíthatók, de a meccsek és
+                eredmények kezelhetők. A verseny <strong>lezárása</strong> után az eredmények alapértelmezetten
+                zároltak; szükség esetén az Admin oldalon ideiglenesen feloldható az eredménymódosítás.
+              </p>
+
+              <h4>Pályák és ütemezés</h4>
+              <p>
+                A <em>pályák száma</em> meghatározza, hány meccs futhat egyszerre. A rendszer a megadott becsült
+                meccsidő és pihenőidők alapján automatikusan oszt el meccseket, figyelve arra, hogy ugyanaz a
+                játékos ne kerüljön egymás utáni pályákra pihenő nélkül. Minél pontosabb a meccsidő becslés,
+                annál reálisabb lesz a generált ütemterv. A <em>check-in türelmi idő</em> azt jelenti, hogy a
+                meccs tervezett kezdete előtt hány perccel kell a játékosnak megjelennie – aki nem jelent meg
+                időben, a rendszer nem sorolja be a következő körbe.
+              </p>
+
+              <h4>Meccsszabályok</h4>
+              <p>
+                A <em>szett rendszer</em> meghatározza a meccs hosszát: BO3 esetén az nyer, aki előbb megnyeri
+                a 2. szettet. A <em>szett hossza</em> és a <em>pontelőny</em> együtt szabja meg a szett végét:
+                ha a szett hossza 21 és az előny 2, akkor 20-20 után legalább 22-20 kell a győzelemhez.
+                A <em>pontplafon</em> felső határt szab ennek: tollaslabdában 30-as plafonnal 29-29 esetén
+                az első pont dönt, nincs végtelenségig tartó hosszabbítás. Ezek az értékek kategóriánként
+                felülbírálhatók, ha például a serdülők rövidebb meccseket játszanak.
+              </p>
+
+              <h4>Kategóriák</h4>
+              <p>
+                A verseny létrehozása után <strong>kategóriákat</strong> kell felvenni (pl. Felnőtt férfi egyes,
+                Vegyes páros stb.). Minden kategória önálló lebonyolítási egység: saját sorsolással, meccslistával
+                és tabellával rendelkezik. Kategóriánként beállítható a formátum (csoportkör, rájátszás vagy
+                vegyes), a csoportméret, a továbbjutók száma és a holtverseny szabály. Egy versenyrendező
+                tipikusan 2–6 kategóriával dolgozik, de a rendszer ennél többet is kezel.
+              </p>
+
+              <h4>Nevezés, check-in és sorsolás</h4>
+              <p>
+                A játékosokat kategóriánként kell felvenni – egyenként vagy tömeges beillesztéssel (soronként
+                egy név). A versenynap reggelén a jelenlévő játékosokat be kell check-inelni; a rendszer csak
+                a check-inelt játékosokat vonja be a sorsolásba. A <em>Sorsolás lezárása</em> gomb ezután
+                létrehozza a csoportokat és generálja a meccseket. Ezt követően az <em>Ütemezés</em> oldalon
+                indítható az automatikus pályaelosztás.
+              </p>
+            </div>
+        )}
+      </div>
   );
 }
+
 
 export function TournamentCreatePage() {
   const auth = useAuth();
@@ -156,7 +179,7 @@ export function TournamentCreatePage() {
               </div>
             </SectionCard>
 
-            <SectionCard title="Pályák és ütemezés" subtitle="A scheduler kiindulási paraméterei.">
+            <SectionCard title="Pályák és ütemezés" subtitle="Hány pályán és mennyi idő alatt játsszák le a meccseket.">
               <div className="form-grid form-grid--two">
                 <FormField label="Pályák száma" htmlFor="courts" hintText="Egyszerre használható pályák maximuma.">
                   <input id="courts" type="number" min="1" max="50" value={form.courtsCount} onChange={(e) => update('courtsCount', e.target.value)} />

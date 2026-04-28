@@ -14,18 +14,22 @@ const ACTION_LABELS = {
   'tournament.finished': 'Verseny lezárva',
   'tournament.finished_edit_unlocked': 'Eredményjavítás feloldva',
   'tournament.finished_edit_locked': 'Eredményjavítás visszazárva',
+  'tournament.configured': 'Verseny konfigurálva',
+  'tournament.global_schedule_generated': 'Globális ütemezés generálva',
   'category.created': 'Kategória létrehozva',
   'category.updated': 'Kategória módosítva',
-  'category.draw_finalized': 'Draw lezárva',
+  'category.draw_finalized': 'Sorsolás lezárva',
   'player.bulk_added': 'Játékosok tömeges felvétele',
-  'player.checkin': 'Check-in jelölés',
+  'player.checkin': 'Jelenlét jelölés',
   'group.schedule_generated': 'Ütemezés generálva',
+  'group.schedule_reset': 'Ütemezés visszaállítva',
+  'match.result_recorded': 'Eredmény rögzítve',
   'match.result_set': 'Eredmény rögzítve',
   'match.result_updated': 'Eredmény javítva',
   'match.outcome_set': 'Speciális lezárás',
   'match.status_changed': 'Státuszváltás',
-  'playoff.generated': 'Playoff generálva',
-  'playoff.advanced': 'Playoff következő kör',
+  'playoff.generated': 'Rájátszás generálva',
+  'playoff.advanced': 'Rájátszás következő köre',
   'payment_group.created': 'Fizetési csoport létrehozva',
   'payment_group.updated': 'Fizetési csoport módosítva',
 };
@@ -36,8 +40,8 @@ function actionLabel(action) {
 
 function actionTone(action) {
   if (action.includes('created') || action.includes('started') || action.includes('generated') || action.includes('advanced')) return 'success';
-  if (action.includes('updated') || action.includes('set') || action.includes('changed')) return 'neutral';
-  if (action.includes('finished') || action.includes('finalized')) return 'warning';
+  if (action.includes('updated') || action.includes('set') || action.includes('changed') || action.includes('recorded')) return 'neutral';
+  if (action.includes('finished') || action.includes('finalized') || action.includes('locked')) return 'warning';
   return 'neutral';
 }
 
@@ -81,7 +85,6 @@ export function AdminPage({ params }) {
   }
 
   function downloadCsv(path) {
-    // Build authenticated download link via fetch + blob
     const url = buildExportUrl(path);
     fetch(url, { headers: { Authorization: `Bearer ${auth.token}` } })
       .then((res) => {
@@ -100,7 +103,18 @@ export function AdminPage({ params }) {
       .catch((err) => setError(err.message));
   }
 
-  const categoryGroups = useMemo(() => {
+  // Kategóriánként csoportosított csoportlista a tabella-exporthoz
+  const groupsByCategory = useMemo(() => {
+    return categories
+      .map((cat) => ({
+        category: cat,
+        groups: groups.filter((g) => String(g.categoryId) === String(cat._id)),
+      }))
+      .filter((item) => item.groups.length > 0);
+  }, [categories, groups]);
+
+  // Kategória szűrőhöz tartozó csoportok (meccslista/játékoslista szűrőnél nem kell csoport)
+  const filteredGroups = useMemo(() => {
     return groups.filter((g) => exportCategoryId ? String(g.categoryId) === exportCategoryId : true);
   }, [groups, exportCategoryId]);
 
@@ -120,6 +134,8 @@ export function AdminPage({ params }) {
     ? `/api/exports/groups/${exportGroupId}/standings.csv`
     : null;
 
+  const hasGroups = groups.length > 0;
+
   return (
     <div className="stack-xl">
       <BackLink to={`/tournaments/${id}`}>Vissza a versenyhez</BackLink>
@@ -134,25 +150,24 @@ export function AdminPage({ params }) {
       <div className="page-grid">
         <div className="page-grid__main stack-lg">
 
-          <SectionCard title="CSV Export" subtitle="Az adatok letölthetők CSV formátumban, táblázatkezelőben megnyithatók.">
-            <div className="form-grid form-grid--two" style={{ marginBottom: '1.25rem' }}>
+          <SectionCard title="CSV Export" subtitle="Az adatok letölthetők CSV formátumban, táblázatkezelőben (pl. Excel) megnyithatók.">
+
+            {/* Meccslista és játékoslista – kategória szűrővel */}
+            <div className="form-grid form-grid--two" style={{ marginBottom: '1.5rem' }}>
               <div>
                 <label className="form-label" htmlFor="export-category">Szűrés kategóriára (opcionális)</label>
-                <select id="export-category" value={exportCategoryId} onChange={(e) => { setExportCategoryId(e.target.value); setExportGroupId(''); }}>
+                <select
+                  id="export-category"
+                  value={exportCategoryId}
+                  onChange={(e) => { setExportCategoryId(e.target.value); setExportGroupId(''); }}
+                >
                   <option value="">Összes kategória</option>
                   {categories.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="form-label" htmlFor="export-group">Tabella – Csoport kiválasztása</label>
-                <select id="export-group" value={exportGroupId} onChange={(e) => setExportGroupId(e.target.value)}>
-                  <option value="">— válassz csoportot —</option>
-                  {categoryGroups.map((g) => <option key={g._id} value={g._id}>{g.name}</option>)}
-                </select>
-              </div>
             </div>
 
-            <div className="export-grid">
+            <div className="export-grid" style={{ marginBottom: '2rem' }}>
               <div className="export-card">
                 <div className="export-card__info">
                   <strong>Meccslista</strong>
@@ -166,31 +181,70 @@ export function AdminPage({ params }) {
 
               <div className="export-card">
                 <div className="export-card__info">
-                  <strong>Játékos / Check-in lista</strong>
-                  <span className="muted">Játékosok club-adattal, check-in státusszal.</span>
+                  <strong>Játékos / Jelenlét lista</strong>
+                  <span className="muted">Játékosok klubadattal, jelenlét státusszal.</span>
                   {exportCategoryId ? <span className="hint-text">Szűrve: {categories.find((c) => c._id === exportCategoryId)?.name}</span> : null}
                 </div>
                 <button className="button button--primary" type="button" onClick={() => downloadCsv(playersCsvPath)}>
                   Letöltés
                 </button>
               </div>
-
-              <div className="export-card">
-                <div className="export-card__info">
-                  <strong>Csoportállás (tabella)</strong>
-                  <span className="muted">Helyezések, győzelmek, szett- és pontkülönbség.</span>
-                  {!exportGroupId ? <span className="hint-text warning-text">Válassz csoportot a fenti szűrőből.</span> : null}
-                </div>
-                <button
-                  className="button button--primary"
-                  type="button"
-                  disabled={!exportGroupId}
-                  onClick={() => standingsCsvPath && downloadCsv(standingsCsvPath)}
-                >
-                  Letöltés
-                </button>
-              </div>
             </div>
+
+            {/* Tabella export – csak ha vannak csoportok */}
+            {hasGroups ? (
+              <>
+                <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem', marginBottom: '1rem' }}>
+                  <label className="form-label" htmlFor="export-group">Csoportállás exporthoz – válassz csoportot</label>
+                  <select
+                    id="export-group"
+                    value={exportGroupId}
+                    onChange={(e) => setExportGroupId(e.target.value)}
+                    style={{ maxWidth: '24rem' }}
+                  >
+                    <option value="">— válassz csoportot —</option>
+                    {groupsByCategory.map(({ category, groups: catGroups }) => (
+                      <optgroup key={category._id} label={category.name}>
+                        {catGroups.map((g) => (
+                          <option key={g._id} value={g._id}>{g.name}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="export-grid">
+                  <div className="export-card">
+                    <div className="export-card__info">
+                      <strong>Csoportállás (tabella)</strong>
+                      <span className="muted">Helyezések, győzelmek, szett- és pontkülönbség.</span>
+                      {!exportGroupId
+                        ? <span className="hint-text warning-text">Válassz csoportot a fenti listából.</span>
+                        : <span className="hint-text">
+                            {(() => {
+                              const g = groups.find((gr) => gr._id === exportGroupId);
+                              const cat = g ? categories.find((c) => String(c._id) === String(g.categoryId)) : null;
+                              return g ? `${cat?.name ?? ''} – ${g.name}` : '';
+                            })()}
+                          </span>
+                      }
+                    </div>
+                    <button
+                      className="button button--primary"
+                      type="button"
+                      disabled={!exportGroupId}
+                      onClick={() => standingsCsvPath && downloadCsv(standingsCsvPath)}
+                    >
+                      Letöltés
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.25rem' }}>
+                <span className="muted">A csoportállás export akkor érhető el, ha a sorsolás már megtörtént és csoportok jöttek létre.</span>
+              </div>
+            )}
           </SectionCard>
 
           <SectionCard
@@ -205,7 +259,6 @@ export function AdminPage({ params }) {
                   <tr>
                     <th>Időpont</th>
                     <th>Művelet</th>
-                    <th>Összefoglaló</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -217,7 +270,6 @@ export function AdminPage({ params }) {
                           {actionLabel(log.action)}
                         </StatusBadge>
                       </td>
-                      <td>{log.summary ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -247,8 +299,8 @@ export function AdminPage({ params }) {
           <SectionCard title="Export megjegyzések">
             <ul className="bullet-list">
               <li>A CSV fájlok táblázatkezelőben (pl. Excel, LibreOffice Calc) megnyithatók.</li>
-              <li>Meccslista és játékoslista kategóriaszűrővel szűkíthető.</li>
-              <li>Tabella exporthoz ki kell választani a konkrét csoportot.</li>
+              <li>Meccslista és játékoslista az összes kategóriára, vagy egy adott kategóriára szűrve tölthető le.</li>
+              <li>Csoportállás exporthoz ki kell választani a konkrét csoportot – a lista kategóriánként tagolt.</li>
             </ul>
           </SectionCard>
         </aside>
