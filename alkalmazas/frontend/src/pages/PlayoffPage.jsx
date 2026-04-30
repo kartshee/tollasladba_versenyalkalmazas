@@ -274,8 +274,8 @@ export function PlayoffPage({ params }) {
                 {resultRows.map((row, index) => (
                   <div key={`playoff-set-${index}`} className="score-row">
                     <span>{index + 1}. szett</span>
-                    <input type="number" min="0" value={row.p1} onChange={(e) => setResultRows((state) => state.map((item, itemIndex) => itemIndex === index ? { ...item, p1: e.target.value } : item))} placeholder="P1" />
-                    <input type="number" min="0" value={row.p2} onChange={(e) => setResultRows((state) => state.map((item, itemIndex) => itemIndex === index ? { ...item, p2: e.target.value } : item))} placeholder="P2" />
+                    <input type="number" min="0" value={row.p1} onChange={(e) => setResultRows((state) => state.map((item, itemIndex) => itemIndex === index ? { ...item, p1: e.target.value } : item))} placeholder="1. játékos" />
+                    <input type="number" min="0" value={row.p2} onChange={(e) => setResultRows((state) => state.map((item, itemIndex) => itemIndex === index ? { ...item, p2: e.target.value } : item))} placeholder="2. játékos" />
                   </div>
                 ))}
                 <button className="button button--primary button--block" type="submit" disabled={!selectedMatch}>Eredmény mentése</button>

@@ -161,8 +161,8 @@ export function StandingsPage({ params }) {
           <SectionCard title="Holtverseny szabály" subtitle="A kategória konfigurációja alapján.">
             {category ? (
               <ul className="bullet-list">
-                <li><strong>Többfős holtverseny:</strong> {category.multiTiePolicy === 'direct_only' ? 'csak mini-tabella' : 'mini-tabella, majd overall'}</li>
-                <li><strong>Feloldhatatlan tie:</strong> {category.unresolvedTiePolicy === 'shared_place' ? 'közös helyezés' : 'kézi döntés szükséges'}</li>
+                <li><strong>Többfős holtverseny:</strong> {category.multiTiePolicy === 'direct_only' ? 'csak mini-tabella' : 'mini-tabella, majd összesített'}</li>
+                <li><strong>Feloldhatatlan holtverseny:</strong> {category.unresolvedTiePolicy === 'shared_place' ? 'közös helyezés' : 'kézi döntés szükséges'}</li>
               </ul>
             ) : <div className="muted">Betöltés...</div>}
           </SectionCard>
