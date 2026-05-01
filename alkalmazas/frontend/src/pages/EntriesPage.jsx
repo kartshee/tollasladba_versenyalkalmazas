@@ -6,13 +6,14 @@ import { StatusBadge } from '../components/StatusBadge.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
 import { AppLink } from '../components/AppLink.jsx';
-import { formatCurrency, normalizeSearch } from '../services/formatters.jsx';
+import { formatCurrency, formatPaymentMethod, normalizeSearch, paymentMethodOptions } from '../services/formatters.jsx';
 
 const emptyEntryForm = {
   feeAmount: '',
   billingName: '',
   billingAddress: '',
   paid: false,
+  paymentMethod: 'unknown',
   paymentGroupId: '',
 };
 
@@ -27,10 +28,10 @@ export function EntriesPage({ params }) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [quickAdd, setQuickAdd] = useState({ name: '', club: '', categoryId: '' });
-  const [filters, setFilters] = useState({ categoryId: '', paid: 'all', search: '' });
+  const [filters, setFilters] = useState({ categoryId: '', paid: 'all', paymentMethod: 'all', search: '' });
   const [selectedEntryId, setSelectedEntryId] = useState('');
   const [entryForm, setEntryForm] = useState(emptyEntryForm);
-  const [paymentForm, setPaymentForm] = useState({ payerName: '', billingName: '', billingAddress: '', paid: false, entryIdsText: '' });
+  const [paymentForm, setPaymentForm] = useState({ payerName: '', billingName: '', billingAddress: '', paid: false, paymentMethod: 'unknown', entryIdsText: '' });
 
   async function loadAll() {
     const [tournamentData, entriesData, categoriesData, paymentData] = await Promise.all([
@@ -63,12 +64,14 @@ export function EntriesPage({ params }) {
       if (filters.categoryId && String(entry.categoryId?._id ?? entry.categoryId) !== filters.categoryId) return false;
       if (filters.paid === 'paid' && !entry.paid) return false;
       if (filters.paid === 'unpaid' && entry.paid) return false;
+      if (filters.paymentMethod !== 'all' && (entry.paymentMethod ?? 'unknown') !== filters.paymentMethod) return false;
       if (!search) return true;
       const haystack = [
         entry.playerId?.name,
         entry.playerId?.club,
         entry.categoryId?.name,
         entry.paymentGroupId?.payerName,
+        formatPaymentMethod(entry.paymentMethod),
         entry.billingName,
       ].join(' ').toLowerCase();
       return haystack.includes(search);
@@ -90,6 +93,7 @@ export function EntriesPage({ params }) {
       billingName: selectedEntry.billingName ?? '',
       billingAddress: selectedEntry.billingAddress ?? '',
       paid: Boolean(selectedEntry.paid),
+      paymentMethod: selectedEntry.paymentMethod ?? 'unknown',
       paymentGroupId: selectedEntry.paymentGroupId?._id ?? selectedEntry.paymentGroupId ?? '',
     });
   }, [selectedEntry]);
@@ -136,6 +140,7 @@ export function EntriesPage({ params }) {
       await api.patch(`/api/entries/${selectedEntry._id}`, {
         feeAmount: Number(entryForm.feeAmount || 0),
         paid: entryForm.paid,
+        paymentMethod: entryForm.paymentMethod,
         billingName: entryForm.billingName,
         billingAddress: entryForm.billingAddress,
         paymentGroupId: entryForm.paymentGroupId || null,
@@ -173,10 +178,11 @@ export function EntriesPage({ params }) {
         billingName: paymentForm.billingName,
         billingAddress: paymentForm.billingAddress,
         paid: paymentForm.paid,
+        paymentMethod: paymentForm.paymentMethod,
         entryIds,
       }, { token: auth.token });
 
-      setPaymentForm({ payerName: '', billingName: '', billingAddress: '', paid: false, entryIdsText: '' });
+      setPaymentForm({ payerName: '', billingName: '', billingAddress: '', paid: false, paymentMethod: 'unknown', entryIdsText: '' });
       await refreshAndKeepSelection(selectedEntryId);
     } catch (err) {
       setError(err.message);
@@ -223,7 +229,7 @@ export function EntriesPage({ params }) {
 
               <div className="stack-md">
                 <div className="section-card__title-row"><h3>Lista szűrése</h3></div>
-                <div className="form-grid form-grid--three">
+                <div className="form-grid form-grid--four">
                   <FormField label="Kategória" htmlFor="entries-filter-category">
                     <select id="entries-filter-category" value={filters.categoryId} onChange={(e) => setFilters((state) => ({ ...state, categoryId: e.target.value }))}>
                       <option value="">Összes kategória</option>
@@ -237,8 +243,14 @@ export function EntriesPage({ params }) {
                       <option value="unpaid">Nincs befizetve</option>
                     </select>
                   </FormField>
+                  <FormField label="Fizetési mód" htmlFor="entries-filter-payment-method">
+                    <select id="entries-filter-payment-method" value={filters.paymentMethod} onChange={(e) => setFilters((state) => ({ ...state, paymentMethod: e.target.value }))}>
+                      <option value="all">Összes</option>
+                      {paymentMethodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </FormField>
                   <FormField label="Keresés" htmlFor="entries-filter-search">
-                    <input id="entries-filter-search" value={filters.search} onChange={(e) => setFilters((state) => ({ ...state, search: e.target.value }))} placeholder="Név, klub, kategória" />
+                    <input id="entries-filter-search" value={filters.search} onChange={(e) => setFilters((state) => ({ ...state, search: e.target.value }))} placeholder="Név, klub, kategória, fizetési mód" />
                   </FormField>
                 </div>
               </div>
@@ -253,6 +265,7 @@ export function EntriesPage({ params }) {
                   <th>Kategória</th>
                   <th>Klub</th>
                   <th>Fizetett</th>
+                  <th>Fizetési mód</th>
                   <th>Összeg</th>
                   <th>Fizetési csoport</th>
                   <th>Művelet</th>
@@ -275,6 +288,7 @@ export function EntriesPage({ params }) {
                           {entry.paid ? 'befizetve' : 'nincs befizetve'}
                         </StatusBadge>
                       </td>
+                      <td>{formatPaymentMethod(entry.paymentMethod)}</td>
                       <td>{formatCurrency(entry.feeAmount)}</td>
                       <td>{entry.paymentGroupId?.payerName || '—'}</td>
                       <td>
@@ -292,7 +306,7 @@ export function EntriesPage({ params }) {
                 })}
                 {!loading && filteredEntries.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="muted">Nincs a szűrésnek megfelelő nevezés.</td>
+                    <td colSpan="8" className="muted">Nincs a szűrésnek megfelelő nevezés.</td>
                   </tr>
                 ) : null}
               </tbody>
@@ -331,6 +345,11 @@ export function EntriesPage({ params }) {
                     {paymentGroups.map((group) => <option key={group._id} value={group._id}>{group.payerName}</option>)}
                   </select>
                 </FormField>
+                <FormField label="Fizetési mód" htmlFor="entry-payment-method">
+                  <select id="entry-payment-method" value={entryForm.paymentMethod} onChange={(e) => setEntryForm((state) => ({ ...state, paymentMethod: e.target.value }))}>
+                    {paymentMethodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </FormField>
                 <FormField label="Számlázási név" htmlFor="entry-billing-name">
                   <input id="entry-billing-name" value={entryForm.billingName} onChange={(e) => setEntryForm((state) => ({ ...state, billingName: e.target.value }))} />
                 </FormField>
@@ -358,6 +377,11 @@ export function EntriesPage({ params }) {
               </FormField>
               <FormField label="Számlázási cím" htmlFor="payment-billing-address">
                 <textarea id="payment-billing-address" rows="2" value={paymentForm.billingAddress} onChange={(e) => setPaymentForm((state) => ({ ...state, billingAddress: e.target.value }))} />
+              </FormField>
+              <FormField label="Fizetési mód" htmlFor="payment-method">
+                <select id="payment-method" value={paymentForm.paymentMethod} onChange={(e) => setPaymentForm((state) => ({ ...state, paymentMethod: e.target.value }))}>
+                  {paymentMethodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
               </FormField>
               <FormField label="Nevezés ID-k (soronként)" htmlFor="payment-entry-ids" hintText="Opcionális. Ha megadod, a felsorolt nevezések automatikusan ehhez a payment grouphoz lesznek rendelve.">
                 <textarea id="payment-entry-ids" rows="3" value={paymentForm.entryIdsText} onChange={(e) => setPaymentForm((state) => ({ ...state, entryIdsText: e.target.value }))} placeholder="6612...\n6613..." />

@@ -15,6 +15,7 @@ function defaultScheduleForm(tournament) {
     matchMinutes: String(config.estimatedMatchMinutes ?? 35),
     playerRestMinutes: String(config.minRestPlayerMinutes ?? 20),
     courtTurnoverMinutes: String(config.courtTurnoverMinutes ?? 0),
+    assignUmpires: true,
   };
 }
 
@@ -27,6 +28,7 @@ export function SchedulePage({ params }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [scheduling, setScheduling] = useState(false);
+  const [reestimating, setReestimating] = useState(false);
 
   async function loadAll() {
     const [tournamentData, matchesData] = await Promise.all([
@@ -66,6 +68,7 @@ export function SchedulePage({ params }) {
         matchMinutes: Number(form.matchMinutes),
         playerRestMinutes: Number(form.playerRestMinutes),
         courtTurnoverMinutes: Number(form.courtTurnoverMinutes),
+        assignUmpires: Boolean(form.assignUmpires),
         force: false,
       }, { token: auth.token });
       await loadAll();
@@ -76,13 +79,33 @@ export function SchedulePage({ params }) {
     }
   }
 
+  async function reestimateSchedule() {
+    setReestimating(true);
+    setError('');
+    try {
+      await api.post(`/api/matches/tournament/${id}/schedule/reestimate`, {
+        courtsCount: Number(form.courtsCount),
+        matchMinutes: Number(form.matchMinutes),
+        playerRestMinutes: Number(form.playerRestMinutes),
+        courtTurnoverMinutes: Number(form.courtTurnoverMinutes),
+        assignUmpires: Boolean(form.assignUmpires),
+        force: true,
+      }, { token: auth.token });
+      await loadAll();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setReestimating(false);
+    }
+  }
+
   return (
     <div className="stack-xl">
       <BackLink to={`/tournaments/${id}`}>Vissza a versenyhez</BackLink>
       <PageHeader
         eyebrow="Ütemezés"
         title="Globális ütemező és pályanézet"
-        description="Az ütemezés oldalon a teljes verseny várakozó meccsei pályákra és idősávokra oszthatók. A nézet egyszerre mutatja az operatív terhelést és az ütemező kimenetét."
+        description="Az ütemezés oldalon a teljes verseny várakozó meccsei pályákra és idősávokra oszthatók. A rendszer játékvezetői rotációt is tud adni, és a csúszások alapján újrabecsülheti a hátralévő kezdési időket."
       />
       {error ? <div className="alert alert--error">{error}</div> : null}
 
@@ -102,8 +125,15 @@ export function SchedulePage({ params }) {
               <FormField label="Pályaforgás (perc)" htmlFor="schedule-turnover-minutes">
                 <input id="schedule-turnover-minutes" type="number" min="0" max="120" value={form.courtTurnoverMinutes} onChange={(e) => setForm((state) => ({ ...state, courtTurnoverMinutes: e.target.value }))} />
               </FormField>
+              <label className="checkbox-row">
+                <input type="checkbox" checked={form.assignUmpires} onChange={(e) => setForm((state) => ({ ...state, assignUmpires: e.target.checked }))} />
+                <span>Játékvezetők automatikus rotációja</span>
+              </label>
               <div className="actions-row">
                 <button className="button button--primary" type="submit" disabled={scheduling}>{scheduling ? 'Ütemezés...' : 'Ütemező futtatása'}</button>
+                <button className="button button--secondary" type="button" onClick={reestimateSchedule} disabled={reestimating || scheduledMatches.length === 0}>
+                  {reestimating ? 'Újrabecslés...' : 'Dinamikus becslés frissítése'}
+                </button>
               </div>
             </form>
           </SectionCard>
@@ -124,6 +154,7 @@ export function SchedulePage({ params }) {
                           <div className="summary-item__meta">
                             <span>{roundLabel(match.round)}</span>
                             <span>{formatDateTime(match.startAt)}</span>
+                            {match.umpireName ? <span>Jv.: {match.umpireName}</span> : null}
                           </div>
                         </div>
                       ))}
@@ -142,6 +173,7 @@ export function SchedulePage({ params }) {
               <div className="key-value-list__row"><span className="key-value-list__label">Még ütemezetlen</span><span className="key-value-list__value">{pendingMatches.length}</span></div>
               <div className="key-value-list__row"><span className="key-value-list__label">Pályák</span><span className="key-value-list__value">{tournament?.config?.courtsCount ?? '—'}</span></div>
               <div className="key-value-list__row"><span className="key-value-list__label">Jelenlegi meccsidő</span><span className="key-value-list__value">{tournament?.config?.estimatedMatchMinutes ?? '—'} perc</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Játékvezetők</span><span className="key-value-list__value">{tournament?.referees?.length ?? 0}</span></div>
             </div>
           </SectionCard>
 

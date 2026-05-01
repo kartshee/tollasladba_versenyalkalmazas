@@ -95,3 +95,16 @@ export function formatCategoryFormat(value) {
   };
   return labels[value] ?? value ?? '—';
 }
+
+export const paymentMethodOptions = [
+  { value: 'unknown', label: 'Nincs megadva' },
+  { value: 'cash', label: 'Készpénz' },
+  { value: 'bank_transfer', label: 'Átutalás' },
+  { value: 'card', label: 'Bankkártya' },
+  { value: 'other', label: 'Egyéb' },
+];
+
+export function formatPaymentMethod(value) {
+  return paymentMethodOptions.find((option) => option.value === value)?.label ?? value ?? '—';
+}
+

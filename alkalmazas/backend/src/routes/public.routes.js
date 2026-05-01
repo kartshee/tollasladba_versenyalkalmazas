@@ -27,7 +27,7 @@ router.get('/tournaments/:tournamentId/board', async (req, res) => {
             tournamentId: req.params.tournamentId,
             status: 'pending',
             voided: { $ne: true },
-            startAt: { $ne: null, $gte: now }
+            startAt: { $ne: null }
         })
             .sort({ startAt: 1, courtNumber: 1, createdAt: 1 })
             .limit(limitUpcoming)

@@ -16,6 +16,7 @@ function MatchCard({ match, variant = 'running' }) {
   const category = match.categoryId?.name ?? '—';
   const court = match.courtNumber ? `${match.courtNumber}. pálya` : '—';
   const time = variant === 'upcoming' ? formatTime(match.startAt) : null;
+  const umpire = match.umpireName ? `Jv.: ${match.umpireName}` : null;
 
   return (
     <div className={`board-card board-card--${variant}`}>
@@ -28,6 +29,7 @@ function MatchCard({ match, variant = 'running' }) {
       <div className="board-card__meta">
         <span className="board-card__category">{category}</span>
         {time ? <span className="board-card__time">{time}</span> : null}
+        {umpire ? <span className="board-card__time">{umpire}</span> : null}
         {variant === 'running'
           ? <StatusBadge tone="success">Fut</StatusBadge>
           : <StatusBadge tone="neutral">Következik</StatusBadge>}

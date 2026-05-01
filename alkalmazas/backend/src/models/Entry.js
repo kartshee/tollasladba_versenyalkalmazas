@@ -7,6 +7,12 @@ const entrySchema = new mongoose.Schema(
         playerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Player', required: true, index: true },
         feeAmount: { type: Number, default: 0, min: 0 },
         paid: { type: Boolean, default: false, index: true },
+        paymentMethod: {
+            type: String,
+            enum: ['unknown', 'cash', 'bank_transfer', 'card', 'other'],
+            default: 'unknown',
+            index: true
+        },
         billingName: { type: String, trim: true, default: '' },
         billingAddress: { type: String, trim: true, default: '' },
         paymentGroupId: { type: mongoose.Schema.Types.ObjectId, ref: 'PaymentGroup', default: null, index: true }

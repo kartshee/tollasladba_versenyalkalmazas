@@ -7,13 +7,14 @@ import { StatCard } from '../components/StatCard.jsx';
 import { EmptyState } from '../components/EmptyState.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { api } from '../services/api.js';
-import { formatCurrency } from '../services/formatters.jsx';
+import { formatCurrency, formatPaymentMethod, paymentMethodOptions } from '../services/formatters.jsx';
 
 const emptyForm = {
   payerName: '',
   billingName: '',
   billingAddress: '',
   paid: false,
+  paymentMethod: 'unknown',
   note: '',
   entryIds: [],
 };
@@ -36,6 +37,7 @@ function PaymentGroupRow({ group, onSelect, onMarkPaid, selected }) {
           {group.paid ? 'Befizetve' : 'Nincs rendezve'}
         </StatusBadge>
       </td>
+      <td>{formatPaymentMethod(group.paymentMethod)}</td>
       <td>{group.note || '—'}</td>
       <td>
         <div className="inline-actions">
@@ -122,6 +124,7 @@ export function PaymentsPage({ params }) {
       billingName: group.billingName ?? '',
       billingAddress: group.billingAddress ?? '',
       paid: group.paid ?? false,
+      paymentMethod: group.paymentMethod ?? 'unknown',
       note: group.note ?? '',
       entryIds: groupEntryIds,
     });
@@ -159,6 +162,7 @@ export function PaymentsPage({ params }) {
         billingName: form.billingName,
         billingAddress: form.billingAddress,
         paid: Boolean(form.paid),
+        paymentMethod: form.paymentMethod,
         note: form.note,
         entryIds: form.entryIds,
       };
@@ -262,6 +266,11 @@ export function PaymentsPage({ params }) {
                       <option value="true">Befizetve</option>
                     </select>
                   </FormField>
+                  <FormField label="Fizetési mód" htmlFor="paymentMethod">
+                    <select id="paymentMethod" value={form.paymentMethod} onChange={(e) => update('paymentMethod', e.target.value)}>
+                      {paymentMethodOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                  </FormField>
                   <FormField label="Megjegyzés" htmlFor="note">
                     <input id="note" value={form.note} onChange={(e) => update('note', e.target.value)} placeholder="Opcionális megjegyzés" />
                   </FormField>
@@ -296,6 +305,7 @@ export function PaymentsPage({ params }) {
                           <th>Kategória</th>
                           <th>Díj</th>
                           <th>Befizetve?</th>
+                          <th>Fizetési mód</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -317,6 +327,7 @@ export function PaymentsPage({ params }) {
                                 {entry.paid ? 'igen' : 'nem'}
                               </StatusBadge>
                             </td>
+                            <td>{formatPaymentMethod(entry.paymentMethod)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -357,6 +368,7 @@ export function PaymentsPage({ params }) {
                     <th>Befizetett / összes</th>
                     <th>Összeg</th>
                     <th>Státusz</th>
+                    <th>Fizetési mód</th>
                     <th>Megjegyzés</th>
                     <th>Művelet</th>
                   </tr>
@@ -408,6 +420,7 @@ export function PaymentsPage({ params }) {
               <li>Egy csoport több nevezést fog össze egyetlen fizető alá.</li>
               <li>Ha a csoport státuszát befizetettre állítod, a rendszer az összes hozzárendelt nevezést is befizetettre állítja.</li>
               <li>Tipikusan akkor hasznos, ha egy egyesület egyszerre fizeti be több játékos nevezési díját.</li>
+              <li>A fizetési mód adminisztratív bontás: készpénz, átutalás, bankkártya vagy egyéb.</li>
               <li>A rendszer nem kezel tényleges banki tranzakciót – ez kizárólag adminisztratív nyilvántartás.</li>
             </ul>
           </SectionCard>

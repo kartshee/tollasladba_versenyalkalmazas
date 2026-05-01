@@ -121,6 +121,61 @@ function applyPlacement(state, placement) {
     bumpCategoryCount(state, placement.categoryId);
 }
 
+
+function normalizeRefereeNames(referees = []) {
+    return referees
+        .map((referee) => (typeof referee === 'string' ? referee : referee?.name))
+        .filter((name) => typeof name === 'string' && name.trim())
+        .map((name) => name.trim());
+}
+
+/**
+ * Játékvezetői rotáció:
+ * - csak akkor oszt be automatikusan, ha van megadott játékvezetőlista;
+ * - a kevesebbet használt, az adott időpontra már elérhető játékvezetőt preferálja;
+ * - ha mindenki pihenőidőn belül lenne, akkor a legkorábban felszabadulót választja.
+ */
+export function assignUmpiresToPlan(plan = [], referees = [], options = {}) {
+    const names = normalizeRefereeNames(referees);
+    if (names.length === 0) return plan;
+
+    const minRestMs = Number(options.minRestRefereeMinutes ?? 10) * 60 * 1000;
+    const refereeAvailableAt = new Map(names.map((name) => [name, 0]));
+    const refereeUseCount = new Map(names.map((name) => [name, 0]));
+
+    return [...plan]
+        .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
+        .map((item) => {
+            const startMs = new Date(item.startAt).getTime();
+            const endMs = new Date(item.endAt).getTime();
+
+            const candidates = names.map((name) => ({
+                name,
+                availableAt: refereeAvailableAt.get(name) ?? 0,
+                useCount: refereeUseCount.get(name) ?? 0
+            }));
+
+            candidates.sort((a, b) => {
+                const aReady = a.availableAt <= startMs;
+                const bReady = b.availableAt <= startMs;
+                if (aReady !== bReady) return aReady ? -1 : 1;
+                if (a.useCount !== b.useCount) return a.useCount - b.useCount;
+                if (a.availableAt !== b.availableAt) return a.availableAt - b.availableAt;
+                return a.name.localeCompare(b.name, 'hu');
+            });
+
+            const chosen = candidates[0];
+            refereeAvailableAt.set(chosen.name, endMs + minRestMs);
+            refereeUseCount.set(chosen.name, chosen.useCount + 1);
+
+            return {
+                ...item,
+                umpireName: chosen.name
+            };
+        });
+}
+
+
 export function buildSchedule(matches, options) {
     const state = createScheduleState(options);
     const scheduled = [];

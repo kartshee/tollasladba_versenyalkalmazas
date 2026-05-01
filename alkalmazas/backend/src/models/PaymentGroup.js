@@ -7,6 +7,12 @@ const paymentGroupSchema = new mongoose.Schema(
         billingName: { type: String, trim: true, default: '' },
         billingAddress: { type: String, trim: true, default: '' },
         paid: { type: Boolean, default: false, index: true },
+        paymentMethod: {
+            type: String,
+            enum: ['unknown', 'cash', 'bank_transfer', 'card', 'other'],
+            default: 'unknown',
+            index: true
+        },
         note: { type: String, trim: true, default: '' }
     },
     { timestamps: true }

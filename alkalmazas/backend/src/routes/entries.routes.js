@@ -9,6 +9,16 @@ import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '..
 
 const router = Router();
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
+const PAYMENT_METHODS = ['unknown', 'cash', 'bank_transfer', 'card', 'other'];
+
+function normalizePaymentMethod(value) {
+    if (value === undefined || value === null || value === '') return 'unknown';
+    if (!PAYMENT_METHODS.includes(value)) {
+        throw new Error(`paymentMethod must be one of: ${PAYMENT_METHODS.join(', ')}`);
+    }
+    return value;
+}
+
 
 async function loadOwnedEntry(entryId, userId) {
     if (!isValidObjectId(entryId)) return { entry: null, tournament: null };
@@ -45,11 +55,18 @@ router.get('/', async (req, res) => {
     }
     if (req.query.paid === 'true') filter.paid = true;
     if (req.query.paid === 'false') filter.paid = false;
+    if (req.query.paymentMethod) {
+        try {
+            filter.paymentMethod = normalizePaymentMethod(req.query.paymentMethod);
+        } catch (err) {
+            return res.status(400).json({ error: err.message });
+        }
+    }
 
     const entries = await Entry.find(filter)
         .populate('playerId', 'name club')
         .populate('categoryId', 'name')
-        .populate('paymentGroupId', 'payerName paid')
+        .populate('paymentGroupId', 'payerName paid paymentMethod')
         .sort({ createdAt: -1, _id: -1 });
 
     res.json(entries);
@@ -62,7 +79,7 @@ router.patch('/:id', async (req, res) => {
 
     try {
         const before = pickAuditFields(entry, AUDIT_SNAPSHOT_FIELDS.entry);
-        const { feeAmount, paid, billingName, billingAddress, paymentGroupId } = req.body ?? {};
+        const { feeAmount, paid, paymentMethod, billingName, billingAddress, paymentGroupId } = req.body ?? {};
 
         if (feeAmount !== undefined) {
             const amount = Number(feeAmount);
@@ -75,6 +92,7 @@ router.patch('/:id', async (req, res) => {
             if (typeof paid !== 'boolean') return res.status(400).json({ error: 'paid must be a boolean' });
             entry.paid = paid;
         }
+        if (paymentMethod !== undefined) entry.paymentMethod = normalizePaymentMethod(paymentMethod);
         if (billingName !== undefined) entry.billingName = typeof billingName === 'string' ? billingName.trim() : '';
         if (billingAddress !== undefined) entry.billingAddress = typeof billingAddress === 'string' ? billingAddress.trim() : '';
         if (paymentGroupId !== undefined) {
@@ -108,7 +126,7 @@ router.patch('/:id', async (req, res) => {
         const populated = await Entry.findById(entry._id)
             .populate('playerId', 'name club')
             .populate('categoryId', 'name')
-            .populate('paymentGroupId', 'payerName paid');
+            .populate('paymentGroupId', 'payerName paid paymentMethod');
 
         return res.json(populated);
     } catch (err) {
@@ -138,6 +156,7 @@ router.post('/sync-missing', async (req, res) => {
             playerId: player._id,
             feeAmount: tournament.config?.entryFeeEnabled ? Number(tournament.config?.entryFeeAmount ?? 0) : 0,
             paid: false,
+            paymentMethod: 'unknown',
             billingName: '',
             billingAddress: '',
             paymentGroupId: null

@@ -7,6 +7,16 @@ import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '..
 
 const router = Router();
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
+const PAYMENT_METHODS = ['unknown', 'cash', 'bank_transfer', 'card', 'other'];
+
+function normalizePaymentMethod(value) {
+    if (value === undefined || value === null || value === '') return 'unknown';
+    if (!PAYMENT_METHODS.includes(value)) {
+        throw new Error(`A fizetési mód csak ezek egyike lehet: ${PAYMENT_METHODS.join(', ')}`);
+    }
+    return value;
+}
+
 
 /**
  * A fizetési csoport tagságát és a kapcsolt nevezések befizetett állapotát szinkronban tartja.
@@ -29,7 +39,7 @@ async function syncPaymentGroupEntries(group, entryIds = []) {
     if (uniqueIds.length > 0) {
         await Entry.updateMany(
             { _id: { $in: uniqueIds } },
-            { $set: { paymentGroupId: group._id, paid: Boolean(group.paid) } }
+            { $set: { paymentGroupId: group._id, paid: Boolean(group.paid), paymentMethod: group.paymentMethod ?? 'unknown' } }
         );
     }
 }
@@ -98,7 +108,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
     try {
-        const { tournamentId, payerName, billingName = '', billingAddress = '', paid = false, note = '', entryIds = [] } = req.body ?? {};
+        const { tournamentId, payerName, billingName = '', billingAddress = '', paid = false, paymentMethod = 'unknown', note = '', entryIds = [] } = req.body ?? {};
         if (!tournamentId || !isValidId(tournamentId)) return res.status(400).json({ error: 'Érvénytelen versenyazonosító.' });
         if (!payerName || typeof payerName !== 'string' || !payerName.trim()) return res.status(400).json({ error: 'A fizető neve kötelező.' });
         if (typeof paid !== 'boolean') return res.status(400).json({ error: 'A befizetett állapot csak igaz vagy hamis érték lehet.' });
@@ -113,6 +123,7 @@ router.post('/', async (req, res) => {
             billingName: typeof billingName === 'string' ? billingName.trim() : '',
             billingAddress: typeof billingAddress === 'string' ? billingAddress.trim() : '',
             paid,
+            paymentMethod: normalizePaymentMethod(paymentMethod),
             note: typeof note === 'string' ? note.trim() : ''
         });
 
@@ -143,7 +154,7 @@ router.patch('/:id', async (req, res) => {
 
     try {
         const before = pickAuditFields(group, AUDIT_SNAPSHOT_FIELDS.paymentGroup);
-        const { payerName, billingName, billingAddress, paid, note, entryIds } = req.body ?? {};
+        const { payerName, billingName, billingAddress, paid, paymentMethod, note, entryIds } = req.body ?? {};
 
         if (payerName !== undefined) {
             if (typeof payerName !== 'string' || !payerName.trim()) return res.status(400).json({ error: 'A fizető neve kötelező.' });
@@ -155,6 +166,7 @@ router.patch('/:id', async (req, res) => {
             if (typeof paid !== 'boolean') return res.status(400).json({ error: 'A befizetett állapot csak igaz vagy hamis érték lehet.' });
             group.paid = paid;
         }
+        if (paymentMethod !== undefined) group.paymentMethod = normalizePaymentMethod(paymentMethod);
         if (note !== undefined) group.note = typeof note === 'string' ? note.trim() : '';
 
         await group.save();
@@ -162,7 +174,7 @@ router.patch('/:id', async (req, res) => {
         if (entryIds !== undefined) {
             await syncPaymentGroupEntries(group, Array.isArray(entryIds) ? entryIds : []);
         } else {
-            await Entry.updateMany({ paymentGroupId: group._id }, { $set: { paid: Boolean(group.paid) } });
+            await Entry.updateMany({ paymentGroupId: group._id }, { $set: { paid: Boolean(group.paid), paymentMethod: group.paymentMethod ?? 'unknown' } });
         }
 
         await safeRecordAuditEvent({

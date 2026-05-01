@@ -761,16 +761,19 @@ async function seedRunningGroupCategory({ tournament, refereeNames }) {
       continue;
     }
 
-    if (index === 4) {
-      await Match.updateOne({ _id: match._id }, {
-        $set: {
-          ...base,
-          status: 'running',
-          actualStartAt: base.startAt
-        }
-      });
-      continue;
-    }
+      if (index === 4) {
+          const p1Rank = ranking.get(String(match.player1));
+          const p2Rank = ranking.get(String(match.player2));
+          const winner = p1Rank < p2Rank ? match.player1 : match.player2;
+          const loser = p1Rank < p2Rank ? match.player2 : match.player1;
+
+          await Match.updateOne(
+              { _id: match._id },
+              { $set: createPlayedFinish(base, winner, loser, ranking) }
+          );
+
+          continue;
+      }
 
     await Match.updateOne({ _id: match._id }, { $set: { ...base, status: 'pending' } });
   }

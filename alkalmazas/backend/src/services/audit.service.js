@@ -15,8 +15,8 @@ export const AUDIT_SNAPSHOT_FIELDS = {
         'roundNumber', 'drawVersion', 'resultType', 'voided', 'voidReason', 'voidedAt', 'courtNumber',
         'startAt', 'endAt', 'actualStartAt', 'actualEndAt', 'resultUpdatedAt', 'umpireName', 'sets', 'winner', 'createdAt', 'updatedAt'
     ],
-    entry: ['_id', 'tournamentId', 'categoryId', 'playerId', 'feeAmount', 'paid', 'billingName', 'billingAddress', 'paymentGroupId', 'createdAt', 'updatedAt'],
-    paymentGroup: ['_id', 'tournamentId', 'payerName', 'billingName', 'billingAddress', 'paid', 'note', 'createdAt', 'updatedAt']
+    entry: ['_id', 'tournamentId', 'categoryId', 'playerId', 'feeAmount', 'paid', 'paymentMethod', 'billingName', 'billingAddress', 'paymentGroupId', 'createdAt', 'updatedAt'],
+    paymentGroup: ['_id', 'tournamentId', 'payerName', 'billingName', 'billingAddress', 'paid', 'paymentMethod', 'note', 'createdAt', 'updatedAt']
 };
 
 function normalizeAuditData(value) {

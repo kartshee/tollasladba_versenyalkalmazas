@@ -6,7 +6,7 @@ import Player from '../models/Player.js';
 import Tournament from '../models/Tournament.js';
 import { generatePartialRoundRobin, recommendMatchesPerPlayer } from '../services/roundRobin.service.js';
 import { determineMatchWinner, normalizeMatchRules, validateMatchResult } from '../services/badmintonRules.service.js';
-import { buildGlobalSchedule, buildSchedule } from '../services/scheduler.service.js';
+import { assignUmpiresToPlan, buildGlobalSchedule, buildSchedule } from '../services/scheduler.service.js';
 import { assertTournamentOwned, getOwnedTournamentIds, isValidObjectId } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
@@ -98,6 +98,58 @@ function summarizeScheduledMatches(matches) {
         categoryDistribution
     };
 }
+
+
+function validateScheduleNumbers({ courtsCount, matchMinutes, playerRestMinutes, courtTurnoverMinutes, minRestRefereeMinutes = 10, fairnessGap = 1 }) {
+    if (!Number.isInteger(courtsCount) || courtsCount < 1 || courtsCount > 50) return 'courtsCount must be an integer between 1 and 50';
+    if (!Number.isFinite(matchMinutes) || matchMinutes <= 0 || matchMinutes > 240) return 'matchMinutes must be between 1 and 240';
+    if (!Number.isFinite(playerRestMinutes) || playerRestMinutes < 0 || playerRestMinutes > 240) return 'playerRestMinutes must be between 0 and 240';
+    if (!Number.isFinite(courtTurnoverMinutes) || courtTurnoverMinutes < 0 || courtTurnoverMinutes > 120) return 'courtTurnoverMinutes must be between 0 and 120';
+    if (!Number.isFinite(minRestRefereeMinutes) || minRestRefereeMinutes < 0 || minRestRefereeMinutes > 240) return 'minRestRefereeMinutes must be between 0 and 240';
+    if (!Number.isInteger(fairnessGap) || fairnessGap < 0 || fairnessGap > 5) return 'fairnessGap must be an integer between 0 and 5';
+    return null;
+}
+
+function normalizeScheduleInputs(tournament, body = {}) {
+    const cfg = tournament.config ?? {};
+    const courtsCount = Number(body.courtsCount ?? cfg.courtsCount ?? 1);
+    const matchMinutes = Number(body.matchMinutes ?? cfg.estimatedMatchMinutes ?? 35);
+    const playerRestMinutes = Number(body.playerRestMinutes ?? body.breakMinutes ?? cfg.minRestPlayerMinutes ?? 20);
+    const courtTurnoverMinutes = Number(body.courtTurnoverMinutes ?? cfg.courtTurnoverMinutes ?? 0);
+    const minRestRefereeMinutes = Number(body.minRestRefereeMinutes ?? cfg.minRestRefereeMinutes ?? 10);
+    const fairnessGap = Number(body.fairnessGap ?? 1);
+
+    return { courtsCount, matchMinutes, playerRestMinutes, courtTurnoverMinutes, minRestRefereeMinutes, fairnessGap };
+}
+
+async function filterSchedulableMatchesByCheckedIn(matches = []) {
+    const playerIds = new Set();
+    matches.forEach((m) => { playerIds.add(String(m.player1)); playerIds.add(String(m.player2)); });
+    const players = await Player.find({ _id: { $in: Array.from(playerIds) } }).select('_id checkedInAt mainEligibility').lean();
+    const okPlayers = new Set(players.filter((p) => p.checkedInAt && p.mainEligibility === 'main').map((p) => String(p._id)));
+    return matches.filter((m) => okPlayers.has(String(m.player1)) && okPlayers.has(String(m.player2)));
+}
+
+function endForTimeline(match, { now, matchMinutes }) {
+    const nowMs = now.getTime();
+    const matchMs = matchMinutes * 60 * 1000;
+
+    const actualEndMs = match.actualEndAt ? new Date(match.actualEndAt).getTime() : Number.NaN;
+    if (Number.isFinite(actualEndMs)) return new Date(actualEndMs);
+
+    if (match.status === 'running') {
+        const actualStartMs = match.actualStartAt ? new Date(match.actualStartAt).getTime() : Number.NaN;
+        const plannedEndMs = match.endAt ? new Date(match.endAt).getTime() : Number.NaN;
+        const estimatedEndMs = Number.isFinite(actualStartMs)
+            ? actualStartMs + matchMs
+            : (Number.isFinite(plannedEndMs) ? plannedEndMs : nowMs);
+        return new Date(Math.max(nowMs, estimatedEndMs));
+    }
+
+    const plannedEndMs = match.endAt ? new Date(match.endAt).getTime() : Number.NaN;
+    return new Date(Number.isFinite(plannedEndMs) ? plannedEndMs : nowMs);
+}
+
 
 router.get('/', async (req, res) => {
     const { tournamentId, groupId, categoryId, status, round } = req.query;
@@ -510,11 +562,11 @@ router.post('/group/:groupId/schedule', async (req, res) => {
 
 router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
     try {
-        const tournament = await Tournament.findOne({ _id: req.params.tournamentId, ownerId: req.user._id }).select('config status').lean();
+        const tournament = await Tournament.findOne({ _id: req.params.tournamentId, ownerId: req.user._id }).select('config status referees').lean();
         if (!tournament) return res.status(404).json({ error: 'A verseny nem található.' });
         if (tournament.status === 'finished') return res.status(409).json({ error: 'A verseny már lezárt.' });
 
-        const { startAt, courtsCount, matchMinutes, playerRestMinutes, breakMinutes, courtTurnoverMinutes, force = false, fairnessGap = 1 } = req.body ?? {};
+        const { startAt, courtsCount, matchMinutes, playerRestMinutes, breakMinutes, courtTurnoverMinutes, force = false, fairnessGap = 1, assignUmpires = true } = req.body ?? {};
         const parsedStart = startAt ? new Date(startAt) : new Date();
         if (Number.isNaN(parsedStart.getTime())) return res.status(400).json({ error: 'Érvénytelen kezdési időpont.' });
 
@@ -560,7 +612,7 @@ router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
             _id: { $nin: scheduledIds }
         }).select('_id categoryId round player1 player2 courtNumber startAt endAt').lean();
 
-        const plan = buildGlobalSchedule(filtered, {
+        let plan = buildGlobalSchedule(filtered, {
             startAt: parsedStart,
             courtsCount: cCount,
             matchMinutes: mMin,
@@ -570,7 +622,18 @@ router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
             existingMatches: existing
         });
 
-        const ops = plan.map((pp) => ({ updateOne: { filter: { _id: pp.matchId, status: 'pending' }, update: { $set: { startAt: pp.startAt, endAt: pp.endAt, courtNumber: pp.courtNumber } } } }));
+        if (assignUmpires !== false) {
+            plan = assignUmpiresToPlan(plan, tournament.referees ?? [], {
+                minRestRefereeMinutes: tournament.config?.minRestRefereeMinutes ?? 10
+            });
+        }
+
+        const ops = plan.map((pp) => ({
+            updateOne: {
+                filter: { _id: pp.matchId, status: 'pending' },
+                update: { $set: { startAt: pp.startAt, endAt: pp.endAt, courtNumber: pp.courtNumber, umpireName: pp.umpireName ?? '' } }
+            }
+        }));
         if (ops.length > 0) await Match.bulkWrite(ops);
 
         const updated = await Match.find({ tournamentId: req.params.tournamentId, round: { $ne: 'friendly' } })
@@ -595,6 +658,7 @@ router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
                 playerRestMinutes: restMin,
                 courtTurnoverMinutes: turnoverMin,
                 fairnessGap: fairGap,
+                assignUmpires: assignUmpires !== false,
                 force,
                 summary: summarizeScheduledMatches(updated)
             }
@@ -605,6 +669,112 @@ router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+
+router.post('/tournament/:tournamentId/schedule/reestimate', async (req, res) => {
+    try {
+        const tournament = await Tournament.findOne({ _id: req.params.tournamentId, ownerId: req.user._id }).select('config status referees').lean();
+        if (!tournament) return res.status(404).json({ error: 'A verseny nem található.' });
+        if (tournament.status === 'finished') return res.status(409).json({ error: 'A verseny már lezárt.' });
+
+        const { force = true, assignUmpires = true } = req.body ?? {};
+        const options = normalizeScheduleInputs(tournament, req.body ?? {});
+        const validationError = validateScheduleNumbers(options);
+        if (validationError) return res.status(400).json({ error: validationError });
+
+        const now = new Date();
+
+        const pending = await Match.find({
+            tournamentId: req.params.tournamentId,
+            round: { $ne: 'friendly' },
+            status: 'pending',
+            voided: { $ne: true },
+            ...(force ? {} : { startAt: null })
+        })
+            .select('_id tournamentId categoryId groupId player1 player2 roundNumber createdAt startAt endAt courtNumber')
+            .sort({ startAt: 1, courtNumber: 1, roundNumber: 1, createdAt: 1 })
+            .lean();
+
+        if (pending.length === 0) return res.json({ rescheduled: 0, message: 'Nincs újrabecsülhető várakozó meccs.' });
+
+        const filtered = await filterSchedulableMatchesByCheckedIn(pending);
+        if (filtered.length === 0) {
+            return res.json({ rescheduled: 0, message: 'Nincs újrabecsülhető meccs: mindkét játékosnak check-inelve és main jogosultsággal kell rendelkeznie.' });
+        }
+
+        const scheduledIds = filtered.map((m) => m._id);
+        const timelineMatches = await Match.find({
+            tournamentId: req.params.tournamentId,
+            voided: { $ne: true },
+            courtNumber: { $ne: null },
+            _id: { $nin: scheduledIds },
+            status: { $in: ['running', 'finished'] }
+        })
+            .select('_id categoryId round player1 player2 courtNumber startAt endAt actualStartAt actualEndAt status')
+            .lean();
+
+        const existingMatches = timelineMatches.map((match) => ({
+            ...match,
+            endAt: endForTimeline(match, { now, matchMinutes: options.matchMinutes })
+        }));
+
+        let plan = buildGlobalSchedule(filtered, {
+            startAt: now,
+            courtsCount: options.courtsCount,
+            matchMinutes: options.matchMinutes,
+            playerRestMinutes: options.playerRestMinutes,
+            courtTurnoverMinutes: options.courtTurnoverMinutes,
+            fairnessGap: options.fairnessGap,
+            existingMatches
+        });
+
+        if (assignUmpires !== false) {
+            plan = assignUmpiresToPlan(plan, tournament.referees ?? [], {
+                minRestRefereeMinutes: options.minRestRefereeMinutes
+            });
+        }
+
+        const ops = plan.map((pp) => ({
+            updateOne: {
+                filter: { _id: pp.matchId, status: 'pending' },
+                update: { $set: { startAt: pp.startAt, endAt: pp.endAt, courtNumber: pp.courtNumber, umpireName: pp.umpireName ?? '' } }
+            }
+        }));
+        if (ops.length > 0) await Match.bulkWrite(ops);
+
+        const updated = await Match.find({ tournamentId: req.params.tournamentId, round: { $ne: 'friendly' } })
+            .sort({ startAt: 1, createdAt: 1 })
+            .populate('categoryId', 'name')
+            .populate('player1', 'name')
+            .populate('player2', 'name')
+            .populate('winner', 'name');
+
+        await safeRecordAuditEvent({
+            userId: req.user._id,
+            tournamentId: req.params.tournamentId,
+            entityType: 'tournament',
+            entityId: req.params.tournamentId,
+            action: 'tournament.schedule_reestimated',
+            summary: `Dynamic schedule estimate recalculated for ${plan.length} matches`,
+            metadata: {
+                rescheduled: plan.length,
+                recalculatedAt: now,
+                courtsCount: options.courtsCount,
+                matchMinutes: options.matchMinutes,
+                playerRestMinutes: options.playerRestMinutes,
+                courtTurnoverMinutes: options.courtTurnoverMinutes,
+                minRestRefereeMinutes: options.minRestRefereeMinutes,
+                assignUmpires: assignUmpires !== false,
+                summary: summarizeScheduledMatches(updated)
+            }
+        });
+
+        res.json({ rescheduled: plan.length, summary: summarizeScheduledMatches(updated), matches: updated });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 router.patch('/group/:groupId/schedule/reset', async (req, res) => {
     try {
