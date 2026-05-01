@@ -191,10 +191,12 @@ A rendszernek lehetővé kell tennie:
 A nevezésekhez kapcsolódóan kezelhetőnek kell lennie:
 - nevezési díj összege,
 - fizetett vagy nem fizetett állapot,
+- fizetési mód,
 - számlázási név,
 - számlázási cím,
 - payment group hozzárendelés.
-
+  
+A jelenlegi megvalósításban a fizetési mód külön adminisztratív mezőként jelenik meg. A rendszer képes megkülönböztetni például a készpénzes, átutalásos, bankkártyás, egyéb vagy még nem ismert fizetési módot. Ez nem számlázóprogram-funkciót jelent, hanem a helyszíni versenyszervezés pénzügyi nyilvántartását segíti.
 Ez a követelmény azért fontos, mert a valós versenyszervezésben a játékoslista és a nevezési adminisztráció szorosan összekapcsolódik.
 
 A jelenlegi megvalósítás alapján a nevezési adminisztráció része a fizetési csoportok kezelése is. A rendszernek támogatnia kell, hogy több nevezés egy közös fizetési csoporthoz tartozzon, és a fizetési csoport befizetettre állítása a kapcsolódó nevezések fizetési állapotát is szinkronban frissítse. Ez különösen klubos vagy egyesületi befizetések esetén hasznos.
@@ -238,11 +240,14 @@ A rendszernek támogatnia kell:
 - játékospihenő figyelembevételét,
 - pályaforgatási idő figyelembevételét,
 - több kategória közös pályahasználatának kezelését,
-- a pending mérkőzések ütemezését.
+- a pending mérkőzések ütemezését,
+- játékvezetők automatikus rotációját,
+- a még le nem játszott mérkőzések becsült kezdési idejének újraszámítását a tényleges mérkőzésállapotok alapján.
 
 A rendszer ütemezési logikájának célja nem matematikailag optimális globális optimum keresése, hanem olyan gyakorlati megoldás biztosítása, amely életszerű környezetben stabilan használható.
 
-A jelenlegi működésben az ütemezés kézi indítású adminisztratív művelet, tehát a szervező explicit módon futtatja le a menetrendkészítést. Az ütemezés a még függő, ütemezhető mérkőzésekre ad időpontot és pályát, míg az eredményrögzítés önmagában nem tervez újra automatikusan. Ez a tervezési döntés csökkenti a lebonyolítás közbeni kiszámíthatatlan menetrendváltozásokat, és jobban illeszkedik a valós versenyszervezői munkafolyamathoz.
+A jelenlegi rendszerben az ütemezés kiegészült játékvezetői rotációval is. Ha a versenyhez meg vannak adva játékvezetők, akkor a globális ütemezés képes a mérkőzésekhez automatikusan játékvezetőt rendelni. A kiválasztás figyelembe veszi a minimális játékvezetői pihenőidőt és az egyenletes terhelés elvét.
+A rendszer ezen felül támogatja a hátralévő mérkőzések becsült kezdési idejének dinamikus újraszámítását. Ez nem folyamatos háttérfolyamatként működik, hanem adminisztrátori műveletként indítható. A cél az, hogy a futó és már befejezett mérkőzések tényleges időadatai alapján a szervező frissíteni tudja a még várakozó mérkőzések becsült kezdését.
 
 ### FR-08 Mérkőzések állapotkezelése és eredményrögzítése
 
@@ -303,6 +308,8 @@ A rendszernek támogatnia kell:
 - következő mérkőzések megjelenítését,
 - pályaszámok kijelzését,
 - játékosnevek és kategória-információk megjelenítését,
+- játékvezetői információ megjelenítését, ha rendelkezésre áll,
+- becsült kezdési idők kijelzését,
 - nyilvános, egyszerű nézet biztosítását.
 
 A board funkció célja az operatív tájékoztatás, nem az adminisztráció kiváltása.
@@ -430,7 +437,7 @@ A rendszer akkor tekinthető a követelmények szempontjából elfogadhatónak, 
 ### AC-03 Játékos- és nevezéskezelés
 
 - Egy kategóriához játékosok adhatók hozzá egyenként és tömegesen is.
-- A rendszer nyilvántartja a nevezési adatok és a fizetési állapotok alapvető mezőit.
+- A rendszer nyilvántartja a nevezési adatok, a fizetési állapot és a fizetési mód alapvető mezőit.
 - Fizetési csoport használatakor a csoportszintű befizetés a kapcsolódó nevezések állapotát is konzisztensen frissíti.
 - A játékosok check-in állapota külön kezelhető.
 
@@ -445,6 +452,8 @@ A rendszer akkor tekinthető a követelmények szempontjából elfogadhatónak, 
 - A pending mérkőzésekhez kezdési időpont és pályaszám rendelhető.
 - Az ütemezés figyelembe veszi a megadott alapvető pihenőidő-paramétereket.
 - A rendszer több kategória esetén is képes használható beosztást előállítani.
+- A rendszer képes a versenyhez megadott játékvezetők automatikus rotációjára.
+- A rendszer képes a még várakozó mérkőzések becsült kezdési idejének újraszámítására a tényleges mérkőzésállapotok alapján.
 - A már futó mérkőzések és az ütemezési adatok alapján nem engedhető meg pályaütközés vagy játékosütközés a meccsindítás során.
 
 ### AC-06 Eredményrögzítés és állásfrissítés
@@ -490,9 +499,17 @@ A rendszer akkor tekinthető a követelmények szempontjából elfogadhatónak, 
 - Az adminisztrátor képes a lezárt verseny eredményjavítási zárolását feloldani és visszazárni.
 - Feloldás után a szükséges korrekció elvégezhető, majd a verseny újra zárolható.
 
+### AC-13 Játékvezetői rotáció és dinamikus időbecslés
+
+- Ha a versenyhez játékvezetők vannak megadva, a globális ütemezés képes automatikusan játékvezetőt rendelni a mérkőzésekhez.
+- A játékvezetői hozzárendelés figyelembe veszi a minimális játékvezetői pihenőidőt.
+- A rendszer nem osztja be indokolatlanul mindig ugyanazt a játékvezetőt, hanem törekszik az egyenletes terhelésre.
+- A hátralévő pending mérkőzések becsült kezdési ideje adminisztratív művelettel újraszámítható.
+- Az újraszámítás figyelembe veszi a futó mérkőzéseket, a már befejezett mérkőzések tényleges idejét, a pályák elérhetőségét és a játékospihenőt.
+
 ## 3.4 A jelen verzió határai
 
-A követelményspecifikáció összeállításánál fontos figyelembe venni, hogy a dolgozatban szereplő rendszer nem egy teljes körű országos szövetségi versenyplatform, hanem egy szakdolgozati keretek között elkészített, működő prototípus jellegű alkalmazás.
+A követelményspecifikáció összeállításánál fontos figyelembe venni, hogy a dolgozatban szereplő rendszer nem egy teljes körű országos szövetségi versenyplatform, hanem egy szakdolgozati keretek között elkészített, működő és bemutatható alkalmazás.
 
 Ennek megfelelően a jelen verzióban nem elsődleges cél:
 - összetett szerepköralapú jogosultságkezelés,
@@ -763,6 +780,7 @@ Egy nevezés tartalmazza:
 - a játékos azonosítóját,
 - a nevezési díj összegét,
 - a befizetési állapotot,
+- a fizetési módot,
 - a számlázási nevet,
 - a számlázási címet,
 - opcionálisan egy payment group azonosítót.
@@ -783,6 +801,7 @@ A payment group főbb mezői:
 - számlázási név,
 - számlázási cím,
 - befizetési állapot,
+- fizetési mód,
 - megjegyzés.
 
 A `PaymentGroup` és az `Entry` között egy-a-többhöz kapcsolat áll fenn:
@@ -790,6 +809,7 @@ A `PaymentGroup` és az `Entry` között egy-a-többhöz kapcsolat áll fenn:
 - egy nevezés legfeljebb egy payment grouphoz tartozhat.
 
 A megvalósítás fontos részlete, hogy a payment group nem csupán leíró vagy számlázási csoportosító szerepet tölt be, hanem a befizetettség konzisztenciáját is kezeli. A csoport szintű befizetés ezért a felületen és backend oldalon is tényleges tömeges adminisztratív műveletként jelenik meg.
+A fizetési mód mező adminisztratív célú enumként jelenik meg. A jelenlegi rendszerben lehetséges értékei például az ismeretlen, készpénz, átutalás, bankkártya és egyéb fizetési mód. Ez a mező nem pénzügyi tranzakciót hajt végre, hanem a szervező helyszíni nyilvántartását pontosítja.
 
 ### 4.2.8 Group entitás
 
@@ -833,9 +853,11 @@ A mérkőzés legfontosabb mezői:
 - tervezett kezdési és befejezési idő,
 - tényleges kezdési és befejezési idő,
 - eredményfrissítés ideje,
-- játékvezető neve,
+- játékvezető neve vagy automatikusan kiosztott játékvezető,
 - szettek listája,
 - győztes.
+
+A `Match` entitás ütemezési adatai a dinamikus becsléshez is felhasználhatók. A tervezett kezdési és befejezési idő nem csak az első ütemezés eredménye lehet, hanem később a tényleges mérkőzésállapotok alapján újraszámított becslésként is frissülhet. Ez a modell lehetővé teszi, hogy a rendszer a lebonyolítás során bekövetkező csúszásokhoz is alkalmazkodjon.
 
 A `Match` modell tervezése során fontos szempont volt, hogy egyetlen objektumban lehessen kezelni:
 - a csoportkörös mérkőzéseket,
@@ -1012,6 +1034,8 @@ A játékos és nevezés szétválasztása azért előnyös, mert a sporttechnik
 
 A `sync-missing` végpont azt a gyakorlati problémát kezeli, hogy a rendszerben már létező játékosokhoz szükség esetén automatikusan létrehozhatók a hiányzó nevezési rekordok. A fizetési csoportokat kezelő végpontok ezen felül a csoportszintű befizetés és a kapcsolt nevezések fizetési állapota közötti szinkront is biztosítják.
 
+A nevezési és fizetési végpontok a fizetési mód kezelését is támogatják. Ez azt jelenti, hogy a nevezések és a fizetési csoportok módosításakor nemcsak a befizetési állapot, hanem a fizetés típusa is rögzíthető. A fizetési mód enum jellegű mezőként jelenik meg, így a frontend egységes magyar nyelvű címkékkel tudja megjeleníteni.
+
 ### 4.3.6 Csoportokhoz és állásokhoz kapcsolódó végpontok
 
 A csoportkezelés a versenylogika egyik központi eleme, ezért külön végpontcsoportot kapott. A csoportok nem csupán tárolt objektumok, hanem a standings, withdrawal és playoff műveletek belépési pontjai is.
@@ -1045,6 +1069,7 @@ A főbb végpontok:
 - `PATCH /api/matches/:matchId/outcome`
 - `POST /api/matches/group/:groupId/schedule`
 - `POST /api/matches/tournament/:tournamentId/schedule/global`
+- `POST /api/matches/tournament/:tournamentId/schedule/reestimate`
 - `PATCH /api/matches/group/:groupId/schedule/reset`
 
 A mérkőzések generálása csoportszinten történik. A státuszfrissítés és eredményrögzítés külön végpontokban valósul meg, mert ezek eltérő validációs logikát követnek. Az `outcome` végpont speciális kimenetelek, például walkover vagy void kezelésére szolgál. A mérkőzésindításnál a backend külön ellenőrzi a pálya- és játékosütközéseket, valamint azt is, hogy a meccs rendelkezik-e ütemezési adatokkal.
@@ -1077,6 +1102,7 @@ A fő végpont:
 - `GET /public/tournaments/:tournamentId/board`
 
 Ez a végpont a futó és a közelgő mérkőzéseket szolgáltatja, minimalizált adatstruktúrában. A funkció tervezési célja az volt, hogy a versenyirodai vagy kijelzőn történő megjelenítés elkülönüljön az adminisztrációs felülettől.
+A board végpont a dinamikusan frissített becsült kezdési időket és a mérkőzéshez rendelt játékvezető nevét is meg tudja jeleníteni, amennyiben ezek az adatok rendelkezésre állnak. Ez a helyszíni tájékoztatást javítja, mert a játékosok nemcsak a pályaszámot és ellenfelet látják, hanem a várható kezdésről is pontosabb képet kaphatnak.
 
 ### 4.3.10 Tipikus API-folyamatok
 
@@ -1281,7 +1307,29 @@ Ennek eredményeként egyetlen kategória nem tudja teljesen kiszorítani a töb
 
 Ez a megoldás nem globális optimumot keres, hanem gyorsan futó, gyakorlati heurisztikát alkalmaz.
 
-### 4.4.8 Exportfolyamat
+### 4.4.8 Játékvezetői rotáció és dinamikus időbecslés
+
+Az ütemezési logika kiegészült automatikus játékvezetői rotációval. A megoldás alapja az, hogy a versenyhez megadott játékvezetői névlistából a rendszer minden ütemezett mérkőzéshez megpróbál alkalmas játékvezetőt választani.
+
+A kiválasztás során két fő szempont érvényesül:
+- a játékvezető legkorábbi rendelkezésre állási ideje,
+- a játékvezető eddigi terhelése.
+
+A rendszer a minimális játékvezetői pihenőidőt is figyelembe veszi. Ez azt jelenti, hogy egy játékvezető nem osztható be közvetlenül egymás után több mérkőzésre, ha a konfigurált pihenőidő ezt nem engedi. Ha több játékvezető is alkalmas, a rendszer előnyben részesíti azt, aki eddig kevesebb mérkőzést kapott. Ez egyszerű, de gyakorlatban jól értelmezhető fairness-elvet biztosít.
+
+A dinamikus időbecslés célja, hogy a lebonyolítás közbeni csúszások vagy gyorsabb mérkőzések után a szervező frissíteni tudja a még várakozó mérkőzések becsült kezdési idejét. A rendszer ilyenkor nem generál új sorsolást, hanem a meglévő mérkőzésekhez rendelt pálya- és állapotadatok alapján újraszámolja a pending mérkőzések várható kezdését.
+
+Az újraszámítás figyelembe veszi:
+- a már futó mérkőzések pályafoglalását,
+- a befejezett mérkőzések tényleges befejezési idejét,
+- a pályák következő elérhető időpontját,
+- a játékosok minimális pihenőidejét,
+- a pályaforgatási időt,
+- opcionálisan a játékvezetői rotációt.
+
+Ez a megközelítés azért előnyös, mert nem változtatja meg önkényesen a teljes lebonyolítási struktúrát, mégis lehetőséget ad a menetrend életszerű frissítésére.
+
+### 4.4.9 Exportfolyamat
 
 A jelenlegi rendszerben az export logika CSV alapú. Az exportfolyamat három fő lépésből áll:
 
@@ -1296,7 +1344,7 @@ A jelenlegi implementáció külön exportot biztosít:
 
 Ez a logika egyszerűbb, mint egy PDF-generáló pipeline, ugyanakkor a versenyadatok archiválására és további feldolgozására már jelen formájában is alkalmas.
 
-### 4.4.9 Tulajdonosi ellenőrzés és hibaellenálló működés
+### 4.4.10 Tulajdonosi ellenőrzés és hibaellenálló működés
 
 Bár ez nem klasszikus algoritmus a szűk matematikai értelemben, a rendszer stabil működése szempontjából mégis kulcslogikának tekinthető.
 
@@ -1307,7 +1355,7 @@ A backend több szolgáltatási ponton külön ellenőrzi:
 
 Ennek jelentősége abban áll, hogy a rendszer nem csak helyes bemenetre működik, hanem hibás, hiányos vagy rossz sorrendben végrehajtott kérések esetén is kontrollált választ ad. Ez különösen fontos egy olyan adminisztratív rendszerben, ahol a felhasználó sok, egymásra épülő lépést hajt végre.
 
-### 4.4.10 A kulcslogikák összegzése
+### 4.4.11 A kulcslogikák összegzése
 
 A rendszer legfontosabb üzleti értéke abból fakad, hogy a versenyszervezés legnehezebb részeit automatizálja. Ide tartozik:
 - a csoportkör létrehozása,
@@ -1317,6 +1365,8 @@ A rendszer legfontosabb üzleti értéke abból fakad, hogy a versenyszervezés 
 - a továbbjutók meghatározása,
 - a playoff fokozatos felépítése,
 - az ütemezés pálya- és pihenőidő-korlátok mellett.
+- - a játékvezetői rotációt,
+- a dinamikus becsült időfrissítést.
 
 Ezek a logikák együtt teszik lehetővé, hogy a rendszer ne csupán adatnyilvántartó alkalmazás legyen, hanem ténylegesen támogassa a tollaslabda versenyek lebonyolítását.
 
@@ -1450,7 +1500,9 @@ A `roundRobin.service.js`, `standings.service.js`, `playoff.service.js` és `sch
 - a holtversenykezelést,
 - a továbbjutók meghatározását,
 - a playoff ág generálását,
-- a mérkőzések idő- és pályabeosztását.
+- a mérkőzések idő- és pályabeosztását,
+- a játékvezetők automatikus rotációját,
+- a hátralévő mérkőzések becsült idejének újraszámítását.
 
 Az `ownership.service.js` külön figyelmet érdemel. A rendszer egyik fontos biztonsági és konzisztenciaelvét ez biztosítja, mivel segíti annak ellenőrzését, hogy egy adott verseny vagy kapcsolódó objektum valóban a bejelentkezett felhasználóhoz tartozik-e. Ez a megoldás csökkenti annak esélyét, hogy egy route tévesen olyan erőforráshoz adjon hozzáférést, amely nem az aktuális felhasználó tulajdona.
 
@@ -1564,7 +1616,7 @@ A dashboard a felhasználó versenyeinek áttekintését adja, a profiloldal a f
 - `BoardPage.jsx`
 - `AdminPage.jsx`
 
-Ezek az oldalak a verseny lebonyolításának adminisztratív és operatív rétegeit fedik le. A kategóriaoldalak a versenyszámok létrehozására és módosítására szolgálnak, a check-in oldal a tényleges megjelenések rögzítését támogatja, az entries és payments oldalak a nevezési és pénzügyi adminisztrációt kezelik. A meccsek, ütemezés és board oldalak a lebonyolítás valós idejű szakaszaihoz kapcsolódnak, míg az adminoldal export- és naplózási funkciókat is megjelenít.
+Ezek az oldalak a verseny lebonyolításának adminisztratív és operatív rétegeit fedik le. A kategóriaoldalak a versenyszámok létrehozására és módosítására szolgálnak, a check-in oldal a tényleges megjelenések rögzítését támogatja, az entries és payments oldalak pedig a nevezési, fizetési állapotbeli és fizetési mód szerinti adminisztrációt kezelik. A meccsek, ütemezés és board oldalak a lebonyolítás valós idejű szakaszaihoz kapcsolódnak. Az ütemezés oldalon indítható a globális menetrendkészítés, a játékvezetői rotáció és a dinamikus becsült időfrissítés is, míg az adminoldal export- és naplózási funkciókat jelenít meg.
 
 **Kategóriaszintű speciális oldalak:**
 - `StandingsPage.jsx`
@@ -2201,15 +2253,53 @@ Több nevezés ugyanahhoz a fizetési csoporthoz tartozik, és a csoport kezdetb
 
 **Tesztlépések:**  
 1. A fizetési csoportot befizetettre állítani.  
-2. A kapcsolódó nevezések listáját újralekérdezni.  
+2. A fizetési módot megadni vagy módosítani.  
+3. A kapcsolódó nevezések listáját újralekérdezni.  
 
 **Elvárt eredmény:**  
 - A csoport befizetett állapotba kerül.  
+- A fizetési mód mentésre kerül.  
 - A kapcsolódó nevezések `paid` mezői is frissülnek.  
-
+- A kapcsolódó nevezések fizetési módja konzisztensen kezelhető.
 ## 6.3 Edge case-ek és kritikus helyzetek
 
 A rendszer egyik legfontosabb minőségi szempontja, hogy ne csak tipikus bemenetek mellett működjön helyesen. A tollaslabda versenykezelésben több olyan speciális helyzet fordulhat elő, amely külön kezelést igényel. Ezek közül a legfontosabbak az alábbiak.
+
+### TC-26 Automatikus játékvezetői rotáció
+
+**Kapcsolódó követelmények:** FR-07, AC-05, AC-13
+
+**Kiinduló állapot:**  
+A versenyhez több játékvezető tartozik, és több pending mérkőzés vár ütemezésre.
+
+**Tesztlépések:**  
+1. A globális ütemezés futtatása bekapcsolt játékvezetői rotációval.  
+2. Az ütemezett mérkőzések játékvezető mezőinek ellenőrzése.  
+3. A játékvezetők terhelésének és pihenőidejének vizsgálata.  
+
+**Elvárt eredmény:**  
+- A rendszer a mérkőzésekhez játékvezetőt rendel, ha rendelkezésre áll játékvezetői lista.  
+- A kiosztás nem mindig ugyanazt a játékvezetőt választja.  
+- A minimális játékvezetői pihenőidő figyelembevételre kerül.  
+- Játékvezetői lista hiányában a funkció nem okoz hibát, csak nem rendel játékvezetőt.
+
+### TC-27 Dinamikus becsült idő újraszámítása
+
+**Kapcsolódó követelmények:** FR-07, AC-05, AC-13
+
+**Kiinduló állapot:**  
+A versenyben vannak futó, befejezett és pending mérkőzések. A tényleges kezdési és befejezési idők eltérhetnek az eredeti ütemezéstől.
+
+**Tesztlépések:**  
+1. Egyes mérkőzések tényleges állapotának módosítása futó vagy befejezett állapotra.  
+2. A dinamikus becsült időfrissítés indítása.  
+3. A pending mérkőzések új kezdési időpontjainak ellenőrzése.  
+
+**Elvárt eredmény:**  
+- A rendszer a még várakozó mérkőzések becsült kezdési idejét frissíti.  
+- Az újraszámítás figyelembe veszi a pályák foglaltságát.  
+- Az újraszámítás figyelembe veszi a játékosok minimális pihenőidejét.  
+- A funkció nem módosítja a már befejezett mérkőzések eredményét vagy státuszát.
 
 ### 6.3.1 Páratlan létszám és BYE
 
@@ -2278,11 +2368,21 @@ A mérkőzések életciklusának egyik kritikus speciális esete, amikor a szerv
 
 Ezek a szabályok azért fontosak, mert az ütemezésből önmagában még nem következik automatikusan, hogy a futó állapotba váltás üzletileg helyes. A védelemnek ezért backend oldalon is érvényesülnie kell.
 
-### 6.3.8 Lezárt verseny utólagos korrekciója
+### 6.3.8 Játékvezetői ütközés és terhelés
+
+A játékvezetői rotáció bevezetése után külön ellenőrzési szemponttá vált, hogy a rendszer ne osszon be indokolatlanul túl sűrűn ugyanazt a játékvezetőt. A vizsgálat során fontos szempont volt:
+- a minimális játékvezetői pihenőidő betartása,
+- a játékvezetői terhelés közel egyenletes elosztása,
+- annak kezelése, ha nincs megadott játékvezetői lista,
+- annak kezelése, ha a játékvezetői lista kevés a teljes menetrendhez képest.
+
+Ez az edge case azért fontos, mert a játékvezetői rotáció nem lehet erősebb kényszer, mint maga a mérkőzésütemezés. Ha nincs elegendő játékvezető, a rendszernek kontrolláltan kell viselkednie, nem pedig hibás állapotot létrehoznia.
+
+### 6.3.9 Lezárt verseny utólagos korrekciója
 
 Külön edge case-ként jelent meg a lezárt versenyek eredményeinek javítása. Teljes tiltás esetén a rendszer túl merev, korlátlan szerkeszthetőség esetén viszont sérül a lezárt állapot jelentése. A jelenlegi megoldás egy köztes modellt alkalmaz: a verseny lezárása után az eredmények zároltak, de adminisztratív feloldással ideiglenesen javíthatók.
 
-### 6.3.9 Hibás vagy hiányos azonosítók
+### 6.3.10 Hibás vagy hiányos azonosítók
 
 Kritikus ellenőrzési pont volt, hogy a backend hogyan viselkedik hibás vagy hiányzó azonosítók esetén. A cél az volt, hogy:
 - ne jöjjön létre Mongoose cast hiba miatti szerverösszeomlás,
@@ -2291,7 +2391,7 @@ Kritikus ellenőrzési pont volt, hogy a backend hogyan viselkedik hibás vagy h
 
 Ez a fajta tesztelés a robusztusság egyik közvetlen mérőszáma.
 
-### 6.3.10 Demo adatkészlet és bemutatási állapot
+### 6.3.11 Demo adatkészlet és bemutatási állapot
 
 A rendszer demonstrációs használatára tekintettel külön edge case-nek tekinthető, hogy az adatbázis üres vagy nem megfelelő állapotban van. Ennek megoldására szolgál a demo seed, amely:
 - ismert felhasználót hoz létre,
@@ -2309,12 +2409,13 @@ Különösen erős területek:
 - a playoff generálás,
 - a konfigurálható eredményvalidáció,
 - a több kategóriára kiterjedő ütemezési támogatás,
+- a játékvezetői rotáció támogatása,
+- a dinamikus becsült időfrissítés,
 - a pálya- és játékosütközések backend oldali kivédése,
 - a lezárt versenyek kontrollált eredményjavítási mechanizmusa,
-- a fizetési csoportok és nevezések szinkronizált kezelése,
+- a fizetési csoportok, fizetési módok és nevezések szinkronizált kezelése,
 - az audit és export funkciók,
 - a demo adatkészletre épülő bemutathatóság.
-
 A tesztelés során feltárt hibák közül több a rendszer stabilitását és felhasználói folyamatainak következetességét érintette, nem magukat a fő versenyalgoritmusokat. Ilyen volt például a nem létező versenykontextusra történő hibás kliensoldali navigáció. Ezek a hibák rávilágítottak arra, hogy egy adminisztratív rendszer minőségét nemcsak az üzleti logika helyessége, hanem a hibás felhasználói útvonalak kezelése is jelentősen befolyásolja.
 
 Összességében a validáció eredménye azt mutatja, hogy a rendszer szakdolgozati keretek között egy működőképes, reprodukálhatóan tesztelhető és demonstrálható prototípusnak tekinthető, amely a fő követelmények döntő részét teljesíti.
@@ -2328,10 +2429,12 @@ A tesztelés során feltárt hibák közül több a rendszer stabilitását és 
 
 A szakdolgozat célja egy olyan webalapú tollaslabda versenykezelő rendszer megtervezése és megvalósítása volt, amely képes támogatni a versenyek adminisztratív előkészítését, a lebonyolítás közbeni operatív feladatokat, valamint az eredmények és állapotok kezelését. A fejlesztés során a hangsúly nem egy általános sportinformatikai platform létrehozásán volt, hanem egy konkrét, jól körülhatárolt domainprobléma megoldásán: amatőr és kisebb szervezésű tollaslabda versenyek támogatásán.
 
-A dolgozatban bemutatott rendszer ennek megfelelően olyan funkciókat valósít meg, amelyek a versenyszervezés legfontosabb lépéseit fedik le. A megoldás képes:
+A dolgozatban bemutatott rendszer ennek megfelelően olyan funkciókat valósít meg, amelyek a versenyszervezés legfontosabb lépéseit fedik le. 
+A megoldás képes:
 - felhasználók hitelesítésére és elkülönített versenykezelésére,
 - versenyek és kategóriák létrehozására,
 - játékosok és nevezések kezelésére,
+- fizetési állapotok, fizetési módok és fizetési csoportok nyilvántartására,
 - check-in alapú tényleges mezőnyképzésre,
 - csoportkörös mérkőzések generálására,
 - részleges round robin lebonyolítás támogatására,
@@ -2340,6 +2443,8 @@ A dolgozatban bemutatott rendszer ennek megfelelően olyan funkciókat valósít
 - továbbjutók meghatározására,
 - playoff ág generálására és követésére,
 - mérkőzések ütemezésére,
+- játékvezetők automatikus rotációjára,
+- hátralévő mérkőzések becsült kezdési idejének frissítésére,
 - nyilvános board nézet biztosítására,
 - auditnaplózásra és CSV exportokra.
 
@@ -2407,7 +2512,8 @@ A versenylogika oldalán további lehetőséget jelentene:
 - fejlettebb visszalépéskezelés,
 - teljes vigaszág támogatása,
 - páros és vegyes páros versenyszámok teljesebb kezelése,
-- automatikus bíróság- és pályakihasználási optimalizáció.
+- fejlettebb, több szempontot figyelembe vevő játékvezetői és pályakihasználási optimalizáció.
+- A dinamikus időbecslés jelenlegi formájában adminisztrátori művelettel indítható újraszámítás, nem pedig valós idejű, automatikusan futó háttérfolyamat. Ez tudatos egyszerűsítés, mert a szakdolgozati rendszer célja az átlátható és kontrollált lebonyolítás támogatása, nem egy teljesen autonóm menetrendvezérlő rendszer létrehozása.
 
 Jelentős bővítési irány lehet a dokumentumkezelés és export fejlesztése is. A CSV export mellett célszerű lenne:
 - PDF alapú sorsolási és eredménylapok,
@@ -2445,7 +2551,7 @@ A projekt emellett gyakorlati tapasztalatot adott:
 
 Összességében megállapítható, hogy a dolgozatban bemutatott rendszer elérte a kitűzött alapcélt: létrejött egy olyan működőképes, webalapú tollaslabda versenykezelő alkalmazás, amely képes támogatni a versenyek szervezésének és lebonyolításának több kulcsfontosságú lépését.
 
-A rendszer legfontosabb szakmai eredménye, hogy a domainben lényeges automatizmusokat – csoportkör-generálás, standings számítás, tie-break kezelés, playoff felépítés és ütemezés – egységes alkalmazásba integrálja. Bár a megoldás jelenlegi formájában még nem tekinthető teljes körű, végleges terméknek, szakdolgozati keretek között jól használható, érdemi eredményt képviselő és továbbfejleszthető prototípusként értelmezhető.
+A rendszer legfontosabb szakmai eredménye, hogy a domainben lényeges automatizmusokat – csoportkör-generálás, standings számítás, tie-break kezelés, playoff felépítés és ütemezés – egységes alkalmazásba integrálja. Bár a megoldás jelenlegi formájában még nem tekinthető teljes körű, végleges terméknek, szakdolgozati keretek között jól használható, érdemi eredményt képviselő és továbbfejleszthető alkalmazásként értelmezhető.
 
 A projekt így nemcsak egy konkrét szoftvertermék létrehozását jelentette, hanem annak bemutatását is, hogy egy valós problématerületre hogyan lehet informatikai megközelítéssel, strukturált tervezéssel és fokozatos fejlesztéssel működő megoldást készíteni.
 
