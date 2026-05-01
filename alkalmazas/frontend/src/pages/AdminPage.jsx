@@ -32,6 +32,13 @@ const ACTION_LABELS = {
   'playoff.advanced': 'Rájátszás következő köre',
   'payment_group.created': 'Fizetési csoport létrehozva',
   'payment_group.updated': 'Fizetési csoport módosítva',
+  'category.checkin_opened': 'Check-in megnyitva',
+  'category.checkin_closed': 'Check-in lezárva',
+  'category.playoff_generated': 'Rájátszás generálva',
+  'category.completed': 'Kategória lezárva',
+  'category.test_scenarios_ready': 'Tesztforgatókönyvek előkészítve',
+  'results.ready': 'Végeredmények véglegesítve',
+  'finished.lock_active': 'Lezárt verseny eredményei zárolva',
 };
 
 function actionLabel(action) {
