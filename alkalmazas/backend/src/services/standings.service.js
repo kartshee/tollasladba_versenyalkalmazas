@@ -161,9 +161,11 @@ function resolveMulti(entries, finishedMatches, options, nextTieBlockId) {
         mini: miniStatsMap[String(entry.player._id)] ?? createEmptyStat(entry.player)
     }));
 
-    decorated.sort((x, y) => compareMiniDecorated(x, y, { useOverallFallback: options.multiTiePolicy === 'direct_then_overall' }));
+    const useOverallFallback = options.multiTiePolicy === 'direct_then_overall';
+    const miniComparator = (x, y) => compareMiniDecorated(x, y, { useOverallFallback });
 
-    const grouped = groupByComparator(decorated, (x, y) => compareMiniDecorated(x, y, { useOverallFallback: options.multiTiePolicy === 'direct_then_overall' }));
+    decorated.sort(miniComparator);
+    const grouped = groupByComparator(decorated, miniComparator);
 
     const resolved = [];
     for (const block of grouped) {

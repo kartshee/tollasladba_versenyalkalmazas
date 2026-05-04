@@ -195,6 +195,23 @@ export function buildSchedule(matches, options) {
     return scheduled;
 }
 
+/**
+ * Globális, több kategóriás versenyütemező.
+ *
+ * @param {Array} matches - Az összes beütemezendő meccs (kategóriaazonosítóval).
+ * @param {Object} options
+ * @param {Date}   options.startAt               - A verseny tervezett kezdési időpontja.
+ * @param {number} options.courtsCount            - Rendelkezésre álló pályák száma.
+ * @param {number} options.matchMinutes           - Egy meccs becsült időtartama (perc).
+ * @param {number} options.playerRestMinutes      - Játékosok kötelező pihenőideje (perc).
+ * @param {number} [options.courtTurnoverMinutes] - Pálya-felkészítési idő meccsenként (perc).
+ * @param {number} [options.fairnessGap=1]        - Max. megengedett különbség az egyes
+ *                                                  kategóriák beütemezett meccsszámai között.
+ *                                                  Magasabb érték a korai befejezési időt
+ *                                                  favorizálja; 0 = szigorú körforgás.
+ * @param {Array}  [options.existingMatches=[]]   - Már lezárt meccses adatok az állapot
+ *                                                  inicializálásához (újraszámításhoz).
+ */
 export function buildGlobalSchedule(matches, options) {
     const { fairnessGap = 1, existingMatches = [] } = options;
     const state = createScheduleState(options);
