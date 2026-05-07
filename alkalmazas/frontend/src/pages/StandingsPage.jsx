@@ -154,7 +154,7 @@ export function StandingsPage({ params }) {
               <div className="key-value-list__row"><span className="key-value-list__label">Csoportok</span><span className="key-value-list__value">{summary.groups}</span></div>
               <div className="key-value-list__row"><span className="key-value-list__label">Értékelt játékosok</span><span className="key-value-list__value">{summary.players}</span></div>
               <div className="key-value-list__row"><span className="key-value-list__label">Döntetlen</span><span className="key-value-list__value">{summary.unresolved}</span></div>
-              <div className="key-value-list__row"><span className="key-value-list__label">Shared place</span><span className="key-value-list__value">{summary.sharedPlaces}</span></div>
+              <div className="key-value-list__row"><span className="key-value-list__label">Közös helyezések</span><span className="key-value-list__value">{summary.sharedPlaces}</span></div>
             </div>
           </SectionCard>
 

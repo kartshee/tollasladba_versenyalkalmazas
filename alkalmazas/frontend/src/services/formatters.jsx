@@ -54,6 +54,8 @@ export function formatCurrency(value) {
 export function roundLabel(round) {
   const labels = {
     group: 'Csoportkör',
+    playoff_round_of_32: 'Legjobb 32',
+    playoff_round_of_16: 'Legjobb 16',
     playoff_quarter: 'Negyeddöntő',
     playoff_semi: 'Elődöntő',
     playoff_final: 'Döntő',

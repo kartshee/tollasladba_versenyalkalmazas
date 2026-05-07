@@ -1,6 +1,5 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import dotenv from 'dotenv';
 
 import authRoutes from './routes/auth.routes.js';
 import tournamentRoutes from './routes/tournaments.routes.js';
@@ -16,8 +15,8 @@ import entryRoutes from './routes/entries.routes.js';
 import paymentRoutes from './routes/payments.routes.js';
 import publicRoutes from './routes/public.routes.js';
 import { requireAuth } from './middleware/auth.middleware.js';
+import cors from 'cors';
 
-dotenv.config();
 
 export async function connectDb() {
     const mongoUri = process.env.MONGO_URI;
@@ -32,6 +31,7 @@ export async function connectDb() {
 
 const app = express();
 
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
