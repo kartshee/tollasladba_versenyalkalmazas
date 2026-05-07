@@ -109,4 +109,3 @@ export const paymentMethodOptions = [
 export function formatPaymentMethod(value) {
   return paymentMethodOptions.find((option) => option.value === value)?.label ?? value ?? '—';
 }
-

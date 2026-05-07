@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import mongoose from 'mongoose';
 import Entry from '../models/Entry.js';
 import Player from '../models/Player.js';
 import Category from '../models/Category.js';
@@ -8,7 +7,6 @@ import { assertTournamentOwned, getOwnedTournamentIds, isValidObjectId } from '.
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
 const router = Router();
-const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 const PAYMENT_METHODS = ['unknown', 'cash', 'bank_transfer', 'card', 'other'];
 
 function normalizePaymentMethod(value) {
@@ -33,7 +31,7 @@ router.get('/', async (req, res) => {
     const filter = {};
 
     if (req.query.tournamentId) {
-        if (!isValidId(req.query.tournamentId)) return res.status(400).json({ error: 'Invalid tournamentId' });
+        if (!isValidObjectId(req.query.tournamentId)) return res.status(400).json({ error: 'Invalid tournamentId' });
         const t = await assertTournamentOwned(req.query.tournamentId, req.user._id, { lean: true });
         if (!t) return res.json([]);
         filter.tournamentId = req.query.tournamentId;
@@ -42,15 +40,15 @@ router.get('/', async (req, res) => {
     }
 
     if (req.query.categoryId) {
-        if (!isValidId(req.query.categoryId)) return res.status(400).json({ error: 'Invalid categoryId' });
+        if (!isValidObjectId(req.query.categoryId)) return res.status(400).json({ error: 'Invalid categoryId' });
         filter.categoryId = req.query.categoryId;
     }
     if (req.query.playerId) {
-        if (!isValidId(req.query.playerId)) return res.status(400).json({ error: 'Invalid playerId' });
+        if (!isValidObjectId(req.query.playerId)) return res.status(400).json({ error: 'Invalid playerId' });
         filter.playerId = req.query.playerId;
     }
     if (req.query.paymentGroupId) {
-        if (!isValidId(req.query.paymentGroupId)) return res.status(400).json({ error: 'Invalid paymentGroupId' });
+        if (!isValidObjectId(req.query.paymentGroupId)) return res.status(400).json({ error: 'Invalid paymentGroupId' });
         filter.paymentGroupId = req.query.paymentGroupId;
     }
     if (req.query.paid === 'true') filter.paid = true;
@@ -99,7 +97,7 @@ router.patch('/:id', async (req, res) => {
             if (paymentGroupId === null || paymentGroupId === '') {
                 entry.paymentGroupId = null;
             } else {
-                if (!isValidId(paymentGroupId)) return res.status(400).json({ error: 'Invalid paymentGroupId' });
+                if (!isValidObjectId(paymentGroupId)) return res.status(400).json({ error: 'Invalid paymentGroupId' });
                 const pg = await PaymentGroup.findById(paymentGroupId).select('_id tournamentId');
                 if (!pg || String(pg.tournamentId) !== String(entry.tournamentId)) {
                     return res.status(400).json({ error: 'Payment group not found in this tournament' });
@@ -136,7 +134,7 @@ router.patch('/:id', async (req, res) => {
 
 router.post('/sync-missing', async (req, res) => {
     const { tournamentId } = req.body ?? {};
-    if (!tournamentId || !isValidId(tournamentId)) return res.status(400).json({ error: 'Invalid tournamentId' });
+    if (!tournamentId || !isValidObjectId(tournamentId)) return res.status(400).json({ error: 'Invalid tournamentId' });
 
     const tournament = await assertTournamentOwned(tournamentId, req.user._id);
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });

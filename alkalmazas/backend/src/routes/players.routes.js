@@ -1,20 +1,18 @@
 import { Router } from 'express';
-import mongoose from 'mongoose';
 import Player from '../models/Player.js';
 import Tournament from '../models/Tournament.js';
 import Category from '../models/Category.js';
-import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
+import { assertTournamentOwned, getOwnedTournamentIds, isValidObjectId } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 import { ensureEntryForPlayer } from '../services/entry.service.js';
 
 const router = Router();
-const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 router.post('/', async (req, res) => {
     try {
         const { tournamentId, categoryId, name, club, note } = req.body;
 
-        if (!tournamentId || !isValidId(tournamentId)) {
+        if (!tournamentId || !isValidObjectId(tournamentId)) {
             return res.status(400).json({ error: 'Invalid tournamentId' });
         }
         if (!name || typeof name !== 'string' || !name.trim()) {
@@ -30,7 +28,7 @@ router.post('/', async (req, res) => {
 
         let normalizedCategoryId = null;
         if (categoryId !== undefined && categoryId !== null && categoryId !== '') {
-            if (!isValidId(categoryId)) {
+            if (!isValidObjectId(categoryId)) {
                 return res.status(400).json({ error: 'Invalid categoryId' });
             }
 
@@ -78,7 +76,7 @@ router.get('/', async (req, res) => {
     const filter = {};
 
     if (req.query.tournamentId) {
-        if (!isValidId(req.query.tournamentId)) {
+        if (!isValidObjectId(req.query.tournamentId)) {
             return res.status(400).json({ error: 'Invalid tournamentId' });
         }
         const t = await assertTournamentOwned(req.query.tournamentId, req.user._id, { lean: true });
@@ -89,7 +87,7 @@ router.get('/', async (req, res) => {
     }
 
     if (req.query.categoryId) {
-        if (!isValidId(req.query.categoryId)) {
+        if (!isValidObjectId(req.query.categoryId)) {
             return res.status(400).json({ error: 'Invalid categoryId' });
         }
         filter.categoryId = req.query.categoryId;
@@ -101,7 +99,7 @@ router.get('/', async (req, res) => {
 
 router.patch('/:playerId/checkin', async (req, res) => {
     const { playerId } = req.params;
-    if (!isValidId(playerId)) return res.status(400).json({ error: 'Invalid playerId' });
+    if (!isValidObjectId(playerId)) return res.status(400).json({ error: 'Invalid playerId' });
 
     const { checkedIn } = req.body ?? {};
     if (checkedIn !== true && checkedIn !== false) {

@@ -5,7 +5,7 @@ export function AuthLayout({ children }) {
         {/* Brand panel */}
         <div className="auth-layout__brand">
           <div>
-            <div className="auth-brand-logo">TB</div>
+            <div className="auth-brand-logo">TVR</div>
             <div className="auth-brand-title">Tollaslabda Versenykezelő</div>
             <div className="auth-brand-subtitle">
               Letisztult admin felület döntnököknek és versenyszervezőknek.

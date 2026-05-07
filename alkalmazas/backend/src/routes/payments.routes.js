@@ -1,12 +1,10 @@
 import { Router } from 'express';
-import mongoose from 'mongoose';
 import PaymentGroup from '../models/PaymentGroup.js';
 import Entry from '../models/Entry.js';
 import { assertTournamentOwned, getOwnedTournamentIds, isValidObjectId } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 
 const router = Router();
-const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 const PAYMENT_METHODS = ['unknown', 'cash', 'bank_transfer', 'card', 'other'];
 
 function normalizePaymentMethod(value) {
@@ -80,7 +78,7 @@ router.get('/', async (req, res) => {
     const filter = {};
 
     if (req.query.tournamentId) {
-        if (!isValidId(req.query.tournamentId)) return res.status(400).json({ error: 'Érvénytelen versenyazonosító.' });
+        if (!isValidObjectId(req.query.tournamentId)) return res.status(400).json({ error: 'Érvénytelen versenyazonosító.' });
         const t = await assertTournamentOwned(req.query.tournamentId, req.user._id, { lean: true });
         if (!t) return res.json([]);
         filter.tournamentId = req.query.tournamentId;
@@ -109,7 +107,7 @@ router.get('/', async (req, res) => {
 router.post('/', async (req, res) => {
     try {
         const { tournamentId, payerName, billingName = '', billingAddress = '', paid = false, paymentMethod = 'unknown', note = '', entryIds = [] } = req.body ?? {};
-        if (!tournamentId || !isValidId(tournamentId)) return res.status(400).json({ error: 'Érvénytelen versenyazonosító.' });
+        if (!tournamentId || !isValidObjectId(tournamentId)) return res.status(400).json({ error: 'Érvénytelen versenyazonosító.' });
         if (!payerName || typeof payerName !== 'string' || !payerName.trim()) return res.status(400).json({ error: 'A fizető neve kötelező.' });
         if (typeof paid !== 'boolean') return res.status(400).json({ error: 'A befizetett állapot csak igaz vagy hamis érték lehet.' });
 

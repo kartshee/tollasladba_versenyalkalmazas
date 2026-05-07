@@ -1,24 +1,25 @@
 import { Router } from 'express';
-import mongoose from 'mongoose';
 import Group from '../models/Group.js';
 import Match from '../models/Match.js';
 import Player from '../models/Player.js';
-import Tournament from '../models/Tournament.js';
 import Category from '../models/Category.js';
 import { assertTournamentOwned, getOwnedTournamentIds, isValidObjectId } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 import { computeStandings, findCutoffTieBlock } from '../services/standings.service.js';
-import { PLAYOFF_BRONZE_ROUND, buildSeededBracketPairs, getInitialPlayoffRoundName, getNextPlayoffRoundName, getPlayoffRoundSize, isPlayoffRound, sortPlayoffRounds } from '../services/playoff.service.js';
+import {
+    PLAYOFF_BRONZE_ROUND,
+    buildBronzeMatchDoc,
+    buildSeededBracketPairs,
+    findAdvancableRound,
+    getInitialPlayoffRoundName,
+    getNextPlayoffRoundName,
+    getPlayoffRoundSize,
+    isPlayoffRound,
+    makePairKey,
+    sortPlayoffRounds
+} from '../services/playoff.service.js';
 
 const router = Router();
-const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
-
-const makePairKey = (a, b) => {
-    const x = String(a);
-    const y = String(b);
-    return x < y ? `${x}_${y}` : `${y}_${x}`;
-};
-
 
 async function loadOwnedGroup(groupId, userId, { populatePlayers = false } = {}) {
     if (!isValidObjectId(groupId)) return { group: null, tournament: null };
@@ -30,7 +31,6 @@ async function loadOwnedGroup(groupId, userId, { populatePlayers = false } = {})
     if (!tournament) return { group: null, tournament: null };
     return { group, tournament };
 }
-
 
 function getCategoryStandingOptions(category) {
     return {
@@ -93,50 +93,6 @@ function createPlayoffDocsFromStandings({ group, category, qualified }) {
     }));
 }
 
-function buildBronzeMatchDoc({ group, category, semifinalMatches }) {
-    if (!Array.isArray(semifinalMatches) || semifinalMatches.length !== 2) return null;
-    const losers = semifinalMatches.map((match) => {
-        const p1 = String(match.player1);
-        const p2 = String(match.player2);
-        const winner = String(match.winner);
-        return winner === p1 ? match.player2 : match.player1;
-    });
-    if (losers.some((id) => !id)) return null;
-    return {
-        groupId: group._id,
-        tournamentId: group.tournamentId,
-        categoryId: group.categoryId,
-        player1: losers[0],
-        player2: losers[1],
-        pairKey: makePairKey(losers[0], losers[1]),
-        round: PLAYOFF_BRONZE_ROUND,
-        status: 'pending',
-        roundNumber: 1,
-        drawVersion: Number(category.drawVersion ?? 1),
-        resultType: 'played',
-        sets: [],
-        winner: null,
-        courtNumber: null,
-        startAt: null,
-        endAt: null,
-        umpireName: ''
-    };
-}
-
-function findAdvancableRound(matches) {
-    const rounds = [...new Set(matches.map((m) => m.round).filter((round) => isPlayoffRound(round)))].sort(sortPlayoffRounds);
-    const sizes = new Set(rounds.map((round) => getPlayoffRoundSize(round)).filter(Boolean));
-    const candidates = [...sizes].sort((a, b) => a - b);
-    for (const size of candidates) {
-        if (size <= 2) continue;
-        if (sizes.has(size) && !sizes.has(size / 2)) {
-            const currentRound = rounds.find((round) => getPlayoffRoundSize(round) === size);
-            return { currentRound, nextRound: getNextPlayoffRoundName(currentRound) };
-        }
-    }
-    return null;
-}
-
 async function advanceGroupPlayoff({ group, category }) {
     const playoffMatches = await Match.find({ groupId: group._id, voided: { $ne: true }, round: /^playoff_/ }).sort({ roundNumber: 1, createdAt: 1 }).lean();
     if (playoffMatches.length === 0) throw new Error('No playoff matches generated yet');
@@ -176,7 +132,13 @@ async function advanceGroupPlayoff({ group, category }) {
     }, []);
 
     if (adv.currentRound === 'playoff_semi' && !playoffMatches.some((m) => m.round === PLAYOFF_BRONZE_ROUND)) {
-        const bronzeDoc = buildBronzeMatchDoc({ group, category, semifinalMatches: currentMatches });
+        const bronzeDoc = buildBronzeMatchDoc({
+            tournamentId: group.tournamentId,
+            categoryId: group.categoryId,
+            groupId: group._id,
+            drawVersion: Number(category.drawVersion ?? 1),
+            semifinalMatches: currentMatches
+        });
         if (bronzeDoc) docs.push(bronzeDoc);
     }
 
@@ -191,10 +153,10 @@ router.post('/', async (req, res) => {
     try {
         const { tournamentId, categoryId, name, players } = req.body;
 
-        if (!tournamentId || !isValidId(tournamentId)) {
+        if (!tournamentId || !isValidObjectId(tournamentId)) {
             return res.status(400).json({ error: 'Invalid tournamentId' });
         }
-        if (!categoryId || !isValidId(categoryId)) {
+        if (!categoryId || !isValidObjectId(categoryId)) {
             return res.status(400).json({ error: 'Invalid categoryId' });
         }
         if (!name || typeof name !== 'string' || !name.trim()) {
@@ -204,7 +166,6 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ error: 'players must be an array' });
         }
 
-        // Duplikátumok tiltása
         const unique = new Set(players.map(String));
         if (unique.size !== players.length) {
             return res.status(400).json({ error: 'Duplicate playerId in group' });
@@ -220,20 +181,16 @@ router.post('/', async (req, res) => {
         const c = await Category.findById(categoryId);
         if (!c) return res.status(404).json({ error: 'Category not found' });
 
-        // Category ugyanahhoz a tournamenthez tartozzon
         if (c.tournamentId.toString() !== tournamentId.toString()) {
             return res.status(400).json({ error: 'Category does not belong to tournament' });
         }
 
-        // Player validáció: létezzenek és ugyanahhoz a tournamenthez tartozzanak
         if (players.length > 0) {
             const dbPlayers = await Player.find({ _id: { $in: players } }, { tournamentId: 1 });
             if (dbPlayers.length !== players.length) {
                 return res.status(400).json({ error: 'One or more players not found' });
             }
-            const wrong = dbPlayers.find(
-                (p) => p.tournamentId.toString() !== tournamentId.toString()
-            );
+            const wrong = dbPlayers.find((p) => p.tournamentId.toString() !== tournamentId.toString());
             if (wrong) {
                 return res.status(400).json({ error: 'One or more players belong to another tournament' });
             }
@@ -272,7 +229,7 @@ router.get('/', async (req, res) => {
     const filter = {};
 
     if (req.query.tournamentId) {
-        if (!isValidId(req.query.tournamentId)) {
+        if (!isValidObjectId(req.query.tournamentId)) {
             return res.status(400).json({ error: 'Invalid tournamentId' });
         }
         const t = await assertTournamentOwned(req.query.tournamentId, req.user._id, { lean: true });
@@ -283,7 +240,7 @@ router.get('/', async (req, res) => {
     }
 
     if (req.query.categoryId) {
-        if (!isValidId(req.query.categoryId)) {
+        if (!isValidObjectId(req.query.categoryId)) {
             return res.status(400).json({ error: 'Invalid categoryId' });
         }
         filter.categoryId = req.query.categoryId;
@@ -300,7 +257,7 @@ router.get('/', async (req, res) => {
  * Standings
  */
 router.get('/:groupId/standings', async (req, res) => {
-    if (!isValidId(req.params.groupId)) {
+    if (!isValidObjectId(req.params.groupId)) {
         return res.status(400).json({ error: 'Invalid groupId' });
     }
 
@@ -326,8 +283,8 @@ router.patch('/:groupId/withdraw', async (req, res) => {
         const { groupId } = req.params;
         const { playerId, reason, policy, note } = req.body ?? {};
 
-        if (!isValidId(groupId)) return res.status(400).json({ error: 'Invalid groupId' });
-        if (!playerId || !isValidId(playerId)) return res.status(400).json({ error: 'Invalid playerId' });
+        if (!isValidObjectId(groupId)) return res.status(400).json({ error: 'Invalid groupId' });
+        if (!playerId || !isValidObjectId(playerId)) return res.status(400).json({ error: 'Invalid playerId' });
         if (!['injury', 'voluntary', 'disqualified', 'no_show', 'other'].includes(reason)) {
             return res.status(400).json({ error: 'Invalid reason' });
         }
@@ -335,21 +292,20 @@ router.patch('/:groupId/withdraw', async (req, res) => {
         const { group } = await loadOwnedGroup(groupId, req.user._id);
         if (!group) return res.status(404).json({ error: 'Group not found' });
 
-        // játékos tényleg a groupban van?
-        const inGroup = group.players.some(p => String(p) === String(playerId));
+        const inGroup = group.players.some((p) => String(p) === String(playerId));
         if (!inGroup) return res.status(400).json({ error: 'Player not in this group' });
 
-        // policy: ha nem küldik, default mapping
         const effectivePolicy =
-            (policy === 'delete_results' || policy === 'keep_results')
+            policy === 'delete_results' || policy === 'keep_results'
                 ? policy
-                : (reason === 'injury' ? 'keep_results' : 'delete_results');
+                : reason === 'injury'
+                    ? 'keep_results'
+                    : 'delete_results';
 
         const before = pickAuditFields(group, AUDIT_SNAPSHOT_FIELDS.group);
 
-        // upsert withdrawal record (ne duplikáljon)
         group.withdrawals = group.withdrawals ?? [];
-        const existingIdx = group.withdrawals.findIndex(w => String(w.playerId) === String(playerId));
+        const existingIdx = group.withdrawals.findIndex((w) => String(w.playerId) === String(playerId));
         const record = {
             playerId,
             reason,
@@ -366,26 +322,17 @@ router.patch('/:groupId/withdraw', async (req, res) => {
         const now = new Date();
 
         if (effectivePolicy === 'delete_results') {
-            // BWF-szerű: minden érintett meccs VOIDED -> standings/scheduler ignorálja
             const result = await Match.updateMany(
                 {
                     groupId: group._id,
                     round: 'group',
                     $or: [{ player1: playerId }, { player2: playerId }]
                 },
-                {
-                    $set: { voided: true, voidedAt: now, voidReason: reason }
-                }
+                { $set: { voided: true, voidedAt: now, voidReason: reason } }
             );
 
-            // opcionális: pending schedule nullázás a voided meccseknél
             await Match.updateMany(
-                {
-                    groupId: group._id,
-                    round: 'group',
-                    status: 'pending',
-                    voided: true
-                },
+                { groupId: group._id, round: 'group', status: 'pending', voided: true },
                 { $set: { startAt: null, endAt: null, courtNumber: null } }
             );
 
@@ -397,7 +344,6 @@ router.patch('/:groupId/withdraw', async (req, res) => {
             });
         }
 
-        // keep_results: a LE NEM JÁTSZOTT meccseket WO-ként lezárjuk (tie-break torzítás nélkül)
         const pending = await Match.find({
             groupId: group._id,
             round: 'group',
@@ -406,10 +352,8 @@ router.patch('/:groupId/withdraw', async (req, res) => {
             $or: [{ player1: playerId }, { player2: playerId }]
         }).select('_id player1 player2 status').lean();
 
-        const ops = pending.map(m => {
-            const p1 = String(m.player1);
-            const winner = (p1 === String(playerId)) ? m.player2 : m.player1;
-
+        const ops = pending.map((m) => {
+            const winner = String(m.player1) === String(playerId) ? m.player2 : m.player1;
             return {
                 updateOne: {
                     filter: { _id: m._id },
@@ -463,12 +407,12 @@ router.patch('/:groupId/withdraw', async (req, res) => {
  * Playoff meccsek lekérése a groupból
  */
 router.get('/:groupId/playoff', async (req, res) => {
-    if (!isValidId(req.params.groupId)) {
+    if (!isValidObjectId(req.params.groupId)) {
         return res.status(400).json({ error: 'Invalid groupId' });
     }
 
-    const { group: ownedPlayoffGroup } = await loadOwnedGroup(req.params.groupId, req.user._id);
-    if (!ownedPlayoffGroup) return res.status(404).json({ error: 'Group not found' });
+    const { group } = await loadOwnedGroup(req.params.groupId, req.user._id);
+    if (!group) return res.status(404).json({ error: 'Group not found' });
 
     const matches = await Match.find({
         groupId: req.params.groupId,
@@ -496,7 +440,7 @@ router.get('/:groupId/playoff', async (req, res) => {
  * Playoff generálása a csoportból
  */
 router.post('/:groupId/playoff', async (req, res) => {
-    if (!isValidId(req.params.groupId)) {
+    if (!isValidObjectId(req.params.groupId)) {
         return res.status(400).json({ error: 'Invalid groupId' });
     }
 
@@ -519,11 +463,7 @@ router.post('/:groupId/playoff', async (req, res) => {
         });
     }
 
-    const groupMatches = await Match.find({
-        groupId: group._id,
-        round: 'group',
-        voided: { $ne: true }
-    }).lean();
+    const groupMatches = await Match.find({ groupId: group._id, round: 'group', voided: { $ne: true } }).lean();
 
     const unfinished = groupMatches.filter((m) => {
         if (!m.winner) return true;
@@ -539,11 +479,7 @@ router.post('/:groupId/playoff', async (req, res) => {
         });
     }
 
-    const existingPlayoff = await Match.findOne({
-        groupId: group._id,
-        round: /^playoff_/,
-        voided: { $ne: true }
-    });
+    const existingPlayoff = await Match.findOne({ groupId: group._id, round: /^playoff_/, voided: { $ne: true } });
     if (existingPlayoff) {
         return res.status(409).json({ error: 'Playoff already generated for this group' });
     }
@@ -615,7 +551,7 @@ router.post('/:groupId/playoff', async (req, res) => {
  */
 router.post('/:groupId/playoff/advance', async (req, res) => {
     const groupId = req.params.groupId;
-    if (!isValidId(groupId)) return res.status(400).json({ error: 'Invalid groupId' });
+    if (!isValidObjectId(groupId)) return res.status(400).json({ error: 'Invalid groupId' });
 
     const { group } = await loadOwnedGroup(groupId, req.user._id);
     if (!group) return res.status(404).json({ error: 'Group not found' });
@@ -652,7 +588,7 @@ router.post('/:groupId/playoff/advance', async (req, res) => {
  * Visszafelé kompatibilis final generálás endpoint
  */
 router.post('/:groupId/playoff/final', async (req, res) => {
-    if (!isValidId(req.params.groupId)) {
+    if (!isValidObjectId(req.params.groupId)) {
         return res.status(400).json({ error: 'Invalid groupId' });
     }
 
@@ -689,12 +625,12 @@ router.post('/:groupId/playoff/final', async (req, res) => {
 });
 
 router.get('/:groupId/winner', async (req, res) => {
-    if (!isValidId(req.params.groupId)) {
+    if (!isValidObjectId(req.params.groupId)) {
         return res.status(400).json({ error: 'Invalid groupId' });
     }
 
-    const { group: ownedWinnerGroup } = await loadOwnedGroup(req.params.groupId, req.user._id);
-    if (!ownedWinnerGroup) return res.status(404).json({ error: 'Group not found' });
+    const { group } = await loadOwnedGroup(req.params.groupId, req.user._id);
+    if (!group) return res.status(404).json({ error: 'Group not found' });
 
     const final = await Match.findOne({
         groupId: req.params.groupId,

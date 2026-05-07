@@ -566,22 +566,15 @@ router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
         if (!tournament) return res.status(404).json({ error: 'A verseny nem található.' });
         if (tournament.status === 'finished') return res.status(409).json({ error: 'A verseny már lezárt.' });
 
-        const { startAt, courtsCount, matchMinutes, playerRestMinutes, breakMinutes, courtTurnoverMinutes, force = false, fairnessGap = 1, assignUmpires = true } = req.body ?? {};
+        const { startAt, force = false, assignUmpires = true } = req.body ?? {};
         const parsedStart = startAt ? new Date(startAt) : new Date();
         if (Number.isNaN(parsedStart.getTime())) return res.status(400).json({ error: 'Érvénytelen kezdési időpont.' });
 
-        const cfg = tournament.config ?? {};
-        const cCount = Number(courtsCount ?? cfg.courtsCount ?? 1);
-        const mMin = Number(matchMinutes ?? cfg.estimatedMatchMinutes ?? 35);
-        const restMin = Number(playerRestMinutes ?? breakMinutes ?? cfg.minRestPlayerMinutes ?? 20);
-        const turnoverMin = Number(courtTurnoverMinutes ?? cfg.courtTurnoverMinutes ?? 0);
-        const fairGap = Number(fairnessGap ?? 1);
+        const options = normalizeScheduleInputs(tournament, req.body ?? {});
+        const validationError = validateScheduleNumbers(options);
+        if (validationError) return res.status(400).json({ error: validationError });
 
-        if (!Number.isInteger(cCount) || cCount < 1 || cCount > 50) return res.status(400).json({ error: 'courtsCount must be an integer between 1 and 50' });
-        if (!Number.isFinite(mMin) || mMin <= 0 || mMin > 240) return res.status(400).json({ error: 'matchMinutes must be between 1 and 240' });
-        if (!Number.isFinite(restMin) || restMin < 0 || restMin > 240) return res.status(400).json({ error: 'playerRestMinutes must be between 0 and 240' });
-        if (!Number.isFinite(turnoverMin) || turnoverMin < 0 || turnoverMin > 120) return res.status(400).json({ error: 'courtTurnoverMinutes must be between 0 and 120' });
-        if (!Number.isInteger(fairGap) || fairGap < 0 || fairGap > 5) return res.status(400).json({ error: 'fairnessGap must be an integer between 0 and 5' });
+        const { courtsCount: cCount, matchMinutes: mMin, playerRestMinutes: restMin, courtTurnoverMinutes: turnoverMin, fairnessGap: fairGap, minRestRefereeMinutes } = options;
 
         const filter = { tournamentId: req.params.tournamentId, round: { $ne: 'friendly' }, status: 'pending', voided: { $ne: true } };
         if (!force) filter.startAt = null;
@@ -624,7 +617,7 @@ router.post('/tournament/:tournamentId/schedule/global', async (req, res) => {
 
         if (assignUmpires !== false) {
             plan = assignUmpiresToPlan(plan, tournament.referees ?? [], {
-                minRestRefereeMinutes: tournament.config?.minRestRefereeMinutes ?? 10
+                minRestRefereeMinutes
             });
         }
 

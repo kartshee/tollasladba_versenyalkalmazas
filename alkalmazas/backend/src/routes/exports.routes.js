@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import mongoose from 'mongoose';
 import Tournament from '../models/Tournament.js';
 import Category from '../models/Category.js';
 import Group from '../models/Group.js';
@@ -10,7 +9,6 @@ import { sendCsv, formatIso, formatSets, sanitizeFilePart } from '../services/cs
 import { computeStandings } from '../services/standings.service.js';
 
 const router = Router();
-const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 async function loadOwnedGroup(groupId, userId, { populatePlayers = false } = {}) {
     if (!isValidObjectId(groupId)) return { group: null, tournament: null };
@@ -25,7 +23,7 @@ async function loadOwnedGroup(groupId, userId, { populatePlayers = false } = {})
 
 router.get('/tournaments/:tournamentId/matches.csv', async (req, res) => {
     const { tournamentId } = req.params;
-    if (!isValidId(tournamentId)) return res.status(400).json({ error: 'Invalid tournamentId' });
+    if (!isValidObjectId(tournamentId)) return res.status(400).json({ error: 'Invalid tournamentId' });
 
     const tournament = await assertTournamentOwned(tournamentId, req.user._id, { lean: true });
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
@@ -33,14 +31,14 @@ router.get('/tournaments/:tournamentId/matches.csv', async (req, res) => {
     const filter = { tournamentId };
 
     if (req.query.categoryId) {
-        if (!isValidId(req.query.categoryId)) return res.status(400).json({ error: 'Invalid categoryId' });
+        if (!isValidObjectId(req.query.categoryId)) return res.status(400).json({ error: 'Invalid categoryId' });
         const category = await Category.findOne({ _id: req.query.categoryId, tournamentId }).select('_id').lean();
         if (!category) return res.status(404).json({ error: 'Category not found' });
         filter.categoryId = category._id;
     }
 
     if (req.query.groupId) {
-        if (!isValidId(req.query.groupId)) return res.status(400).json({ error: 'Invalid groupId' });
+        if (!isValidObjectId(req.query.groupId)) return res.status(400).json({ error: 'Invalid groupId' });
         const group = await Group.findOne({ _id: req.query.groupId, tournamentId }).select('_id').lean();
         if (!group) return res.status(404).json({ error: 'Group not found' });
         filter.groupId = group._id;
@@ -116,14 +114,14 @@ router.get('/tournaments/:tournamentId/matches.csv', async (req, res) => {
 
 router.get('/tournaments/:tournamentId/players.csv', async (req, res) => {
     const { tournamentId } = req.params;
-    if (!isValidId(tournamentId)) return res.status(400).json({ error: 'Invalid tournamentId' });
+    if (!isValidObjectId(tournamentId)) return res.status(400).json({ error: 'Invalid tournamentId' });
 
     const tournament = await assertTournamentOwned(tournamentId, req.user._id, { lean: true });
     if (!tournament) return res.status(404).json({ error: 'Tournament not found' });
 
     const filter = { tournamentId };
     if (req.query.categoryId) {
-        if (!isValidId(req.query.categoryId)) return res.status(400).json({ error: 'Invalid categoryId' });
+        if (!isValidObjectId(req.query.categoryId)) return res.status(400).json({ error: 'Invalid categoryId' });
         const category = await Category.findOne({ _id: req.query.categoryId, tournamentId }).select('_id').lean();
         if (!category) return res.status(404).json({ error: 'Category not found' });
         filter.categoryId = category._id;
@@ -170,7 +168,7 @@ router.get('/tournaments/:tournamentId/players.csv', async (req, res) => {
 
 router.get('/groups/:groupId/standings.csv', async (req, res) => {
     const { groupId } = req.params;
-    if (!isValidId(groupId)) return res.status(400).json({ error: 'Invalid groupId' });
+    if (!isValidObjectId(groupId)) return res.status(400).json({ error: 'Invalid groupId' });
 
     const { group, tournament } = await loadOwnedGroup(groupId, req.user._id, { populatePlayers: true });
     if (!group || !tournament) return res.status(404).json({ error: 'Group not found' });

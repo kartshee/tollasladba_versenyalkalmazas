@@ -62,3 +62,71 @@ export function findLatestGeneratedPlayoffRound(matches = []) {
     const rounds = [...new Set(matches.map((m) => m.round).filter((round) => isPlayoffRound(round)))].sort(sortPlayoffRounds);
     return rounds[rounds.length - 1] ?? null;
 }
+
+/** Két játékos azonosítójából sorrend-független, egyedi párkulcsot képez. */
+export const makePairKey = (a, b) => {
+    const x = String(a);
+    const y = String(b);
+    return x < y ? `${x}_${y}` : `${y}_${x}`;
+};
+
+/**
+ * Bronzmeccs dokumentumot épít az elődöntők vesztesei alapján.
+ * @param {{ tournamentId, categoryId, groupId, drawVersion, semifinalMatches }} params
+ */
+export function buildBronzeMatchDoc({ tournamentId, categoryId, groupId = null, drawVersion, semifinalMatches }) {
+    if (!Array.isArray(semifinalMatches) || semifinalMatches.length !== 2) return null;
+
+    const losers = semifinalMatches.map((match) => {
+        const winner = String(match.winner);
+        return winner === String(match.player1) ? match.player2 : match.player1;
+    });
+
+    if (losers.some((id) => !id)) return null;
+
+    return {
+        tournamentId,
+        categoryId,
+        groupId,
+        player1: losers[0],
+        player2: losers[1],
+        pairKey: makePairKey(losers[0], losers[1]),
+        round: PLAYOFF_BRONZE_ROUND,
+        status: 'pending',
+        roundNumber: 1,
+        drawVersion: Number(drawVersion ?? 1),
+        resultType: 'played',
+        voided: false,
+        voidReason: '',
+        voidedAt: null,
+        courtNumber: null,
+        startAt: null,
+        endAt: null,
+        actualStartAt: null,
+        actualEndAt: null,
+        resultUpdatedAt: null,
+        umpireName: '',
+        sets: [],
+        winner: null
+    };
+}
+
+/**
+ * Megkeresi azt a rájátszás-kört, amelyből a következő kör generálható.
+ * Visszaad null-t, ha nincs ilyen (pl. a finálé már létezik, vagy a kör még nincs kész).
+ */
+export function findAdvancableRound(matches) {
+    const rounds = [...new Set(matches.map((m) => m.round).filter((round) => isPlayoffRound(round)))].sort(sortPlayoffRounds);
+    const sizes = new Set(rounds.map((round) => getPlayoffRoundSize(round)).filter(Boolean));
+    const candidates = [...sizes].sort((a, b) => a - b);
+
+    for (const size of candidates) {
+        if (size <= 2) continue;
+        if (sizes.has(size) && !sizes.has(size / 2)) {
+            const currentRound = rounds.find((round) => getPlayoffRoundSize(round) === size);
+            return { currentRound, nextRound: getNextPlayoffRoundName(currentRound) };
+        }
+    }
+
+    return null;
+}

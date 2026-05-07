@@ -8,15 +8,21 @@ import { generatePartialRoundRobin, recommendMatchesPerPlayer } from '../service
 import { assertTournamentOwned, isValidObjectId } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
 import { ensureEntryForPlayer } from '../services/entry.service.js';
-import { PLAYOFF_BRONZE_ROUND, buildSeededBracketPairs, findLatestGeneratedPlayoffRound, getInitialPlayoffRoundName, getNextPlayoffRoundName, getPlayoffRoundSize, isSupportedPlayoffSize, sortPlayoffRounds } from '../services/playoff.service.js';
+import {
+    PLAYOFF_BRONZE_ROUND,
+    buildBronzeMatchDoc,
+    buildSeededBracketPairs,
+    findAdvancableRound,
+    findLatestGeneratedPlayoffRound,
+    getInitialPlayoffRoundName,
+    getNextPlayoffRoundName,
+    getPlayoffRoundSize,
+    isSupportedPlayoffSize,
+    makePairKey,
+    sortPlayoffRounds
+} from '../services/playoff.service.js';
 
 const router = Router();
-
-const makePairKey = (a, b) => {
-    const x = String(a);
-    const y = String(b);
-    return x < y ? `${x}_${y}` : `${y}_${x}`;
-};
 
 function shuffle(arr) {
     const copy = [...arr];
@@ -90,55 +96,6 @@ function createPlayoffDocs({ category, groupId = null, players, drawVersion }) {
     }));
 }
 
-function buildBronzeMatchDoc({ category, groupId = null, semifinalMatches }) {
-    if (!Array.isArray(semifinalMatches) || semifinalMatches.length !== 2) return null;
-    const losers = semifinalMatches.map((match) => {
-        const p1 = String(match.player1);
-        const p2 = String(match.player2);
-        const winner = String(match.winner);
-        return winner === p1 ? match.player2 : match.player1;
-    });
-    if (losers.some((id) => !id)) return null;
-    return {
-        tournamentId: category.tournamentId,
-        categoryId: category._id,
-        groupId,
-        player1: losers[0],
-        player2: losers[1],
-        pairKey: makePairKey(losers[0], losers[1]),
-        round: PLAYOFF_BRONZE_ROUND,
-        status: 'pending',
-        roundNumber: 1,
-        drawVersion: Number(category.drawVersion ?? 1),
-        resultType: 'played',
-        voided: false,
-        voidReason: '',
-        voidedAt: null,
-        courtNumber: null,
-        startAt: null,
-        endAt: null,
-        actualStartAt: null,
-        actualEndAt: null,
-        resultUpdatedAt: null,
-        umpireName: '',
-        sets: [],
-        winner: null
-    };
-}
-
-function findAdvancableRound(matches) {
-    const rounds = [...new Set(matches.map((m) => m.round))].sort(sortPlayoffRounds);
-    const sizes = new Set(rounds.map((round) => getPlayoffRoundSize(round)).filter(Boolean));
-    const candidates = [...sizes].sort((a, b) => a - b);
-    for (const size of candidates) {
-        if (size <= 2) continue;
-        if (sizes.has(size) && !sizes.has(size / 2)) {
-            return { currentRound: [...rounds].find((r) => getPlayoffRoundSize(r) === size), nextRound: getNextPlayoffRoundName([...rounds].find((r) => getPlayoffRoundSize(r) === size)) };
-        }
-    }
-    return null;
-}
-
 async function advancePlayoffMatches({ category, groupId = null }) {
     const filter = { categoryId: category._id, voided: { $ne: true } };
     if (groupId) filter.groupId = groupId;
@@ -160,7 +117,10 @@ async function advancePlayoffMatches({ category, groupId = null }) {
         throw new Error('No playoff round can be advanced right now');
     }
 
-    const currentMatches = playoffMatches.filter((m) => m.round === adv.currentRound).sort((a, b) => (a.roundNumber ?? 0) - (b.roundNumber ?? 0));
+    const currentMatches = playoffMatches
+        .filter((m) => m.round === adv.currentRound)
+        .sort((a, b) => (a.roundNumber ?? 0) - (b.roundNumber ?? 0));
+
     const notFinished = currentMatches.filter((m) => !m.winner);
     if (notFinished.length > 0) {
         throw new Error(`Current playoff round is not finished (${adv.currentRound})`);
@@ -199,13 +159,17 @@ async function advancePlayoffMatches({ category, groupId = null }) {
     }, []);
 
     if (adv.currentRound === 'playoff_semi' && !playoffMatches.some((m) => m.round === PLAYOFF_BRONZE_ROUND)) {
-        const bronzeDoc = buildBronzeMatchDoc({ category, groupId, semifinalMatches: currentMatches });
+        const bronzeDoc = buildBronzeMatchDoc({
+            tournamentId: category.tournamentId,
+            categoryId: category._id,
+            groupId,
+            drawVersion: Number(category.drawVersion ?? 1),
+            semifinalMatches: currentMatches
+        });
         if (bronzeDoc) docs.push(bronzeDoc);
     }
 
-    const created = await Match.insertMany(docs);
-
-    return created;
+    return Match.insertMany(docs);
 }
 
 router.post('/:id/players', async (req, res) => {

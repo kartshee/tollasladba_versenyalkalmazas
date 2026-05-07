@@ -1,10 +1,8 @@
 import { Router } from 'express';
-import mongoose from 'mongoose';
 import AuditLog from '../models/AuditLog.js';
-import { assertTournamentOwned, getOwnedTournamentIds } from '../services/ownership.service.js';
+import { assertTournamentOwned, getOwnedTournamentIds, isValidObjectId } from '../services/ownership.service.js';
 
 const router = Router();
-const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 router.get('/', async (req, res) => {
     const { tournamentId, categoryId, entityType, entityId, action } = req.query ?? {};
@@ -12,7 +10,7 @@ router.get('/', async (req, res) => {
 
     const filter = {};
     if (tournamentId) {
-        if (!isValidId(tournamentId)) {
+        if (!isValidObjectId(tournamentId)) {
             return res.status(400).json({ error: 'Invalid tournamentId' });
         }
         const owned = await assertTournamentOwned(tournamentId, req.user._id, { lean: true });
@@ -23,7 +21,7 @@ router.get('/', async (req, res) => {
     }
 
     if (categoryId) {
-        if (!isValidId(categoryId)) {
+        if (!isValidObjectId(categoryId)) {
             return res.status(400).json({ error: 'Invalid categoryId' });
         }
         filter.categoryId = categoryId;
