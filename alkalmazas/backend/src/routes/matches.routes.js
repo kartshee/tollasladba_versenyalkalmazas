@@ -9,6 +9,7 @@ import { determineMatchWinner, normalizeMatchRules, validateMatchResult } from '
 import { assignUmpiresToPlan, buildGlobalSchedule, buildSchedule } from '../services/scheduler.service.js';
 import { assertTournamentOwned, getOwnedTournamentIds, isValidObjectId } from '../services/ownership.service.js';
 import { AUDIT_SNAPSHOT_FIELDS, pickAuditFields, safeRecordAuditEvent } from '../services/audit.service.js';
+import { makePairKey } from '../services/playoff.service.js';
 
 const router = Router();
 
@@ -221,13 +222,9 @@ router.post('/group/:groupId', async (req, res) => {
 
         const matches = await Match.insertMany(
             rawMatches.map((mm) => {
-                const a = String(mm.player1);
-                const b = String(mm.player2);
-                const pairKey = a < b ? `${a}_${b}` : `${b}_${a}`;
-
                 return {
                     ...mm,
-                    pairKey,
+                    pairKey: makePairKey(mm.player1, mm.player2),
                     groupId: group._id,
                     tournamentId: group.tournamentId,
                     categoryId: group.categoryId,
