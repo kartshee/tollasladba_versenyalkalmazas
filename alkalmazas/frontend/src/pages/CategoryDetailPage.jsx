@@ -99,7 +99,7 @@ export function CategoryDetailPage({ params }) {
             </div>
           </SectionCard>
 
-          <SectionCard title="Kategória magyarázat" subtitle="A beállított policyk jelentése.">
+          <SectionCard title="Kategória magyarázat" subtitle="A beállított holtverseny-szabályok magyarázata.">
             <div className="key-value-list">
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Többfős holtverseny</span>
@@ -129,7 +129,7 @@ export function CategoryDetailPage({ params }) {
                 <span className="key-value-list__value">{category.groupsCount}</span>
               </div>
               <div className="key-value-list__row">
-                <span className="key-value-list__label">RR meccsszám</span>
+                <span className="key-value-list__label">Csoportkör meccsszám</span>
                 <span className="key-value-list__value">{category.groupStageMatchesPerPlayer ?? '-'}</span>
               </div>
             </div>

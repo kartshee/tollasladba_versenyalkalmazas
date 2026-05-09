@@ -153,28 +153,32 @@ function endForTimeline(match, { now, matchMinutes }) {
 
 
 router.get('/', async (req, res) => {
-    const { tournamentId, groupId, categoryId, status, round } = req.query;
+    try {
+        const { tournamentId, groupId, categoryId, status, round } = req.query;
 
-    const filter = {};
-    if (tournamentId) {
-        const t = await assertTournamentOwned(tournamentId, req.user._id, { lean: true });
-        if (!t) return res.json([]);
-        filter.tournamentId = tournamentId;
-    } else {
-        filter.tournamentId = { $in: await getOwnedTournamentIds(req.user._id) };
+        const filter = {};
+        if (tournamentId) {
+            const t = await assertTournamentOwned(tournamentId, req.user._id, { lean: true });
+            if (!t) return res.json([]);
+            filter.tournamentId = tournamentId;
+        } else {
+            filter.tournamentId = { $in: await getOwnedTournamentIds(req.user._id) };
+        }
+        if (groupId) filter.groupId = groupId;
+        if (categoryId) filter.categoryId = categoryId;
+        if (status) filter.status = status;
+        if (round) filter.round = round;
+
+        const matches = await Match.find(filter)
+            .sort({ startAt: 1, createdAt: 1 })
+            .populate('player1', 'name')
+            .populate('player2', 'name')
+            .populate('winner', 'name');
+
+        res.json(matches);
+    } catch (err) {
+        res.status(500).json({ error: 'Váratlan szerverhiba történt.' });
     }
-    if (groupId) filter.groupId = groupId;
-    if (categoryId) filter.categoryId = categoryId;
-    if (status) filter.status = status;
-    if (round) filter.round = round;
-
-    const matches = await Match.find(filter)
-        .sort({ startAt: 1, createdAt: 1 })
-        .populate('player1', 'name')
-        .populate('player2', 'name')
-        .populate('winner', 'name');
-
-    res.json(matches);
 });
 
 router.get('/group/:groupId', async (req, res) => {

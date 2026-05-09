@@ -72,7 +72,7 @@ export function ProfilePage() {
               </div>
               <div className="key-value-list__row">
                 <span className="key-value-list__label">Szerepkör</span>
-                <span className="key-value-list__value">{user?.role ?? '—'}</span>
+                  <span className="key-value-list__value"> {user?.role === 'admin' ? 'Adminisztrátor' : user?.role ?? '—'}</span>
               </div>
             </div>
           </SectionCard>
