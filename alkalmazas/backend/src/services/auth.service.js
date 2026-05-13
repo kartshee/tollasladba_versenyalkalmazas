@@ -2,10 +2,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 const DEFAULT_JWT_EXPIRES_IN = '7d';
-const DEFAULT_JWT_SECRET = 'dev_jwt_secret_change_me';
-
 export function getJwtSecret() {
-    return process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET environment variable is required');
+    return secret;
 }
 
 export function getJwtExpiresIn() {
