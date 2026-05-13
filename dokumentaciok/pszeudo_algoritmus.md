@@ -1,3 +1,4 @@
+# Korai tervezési dokumentum — a végleges implementáció a 4.4 fejezetben kerül leírásra.
 # Meccskijelölő Algoritmus – Pszeudokód és Folyamatlogika
 
 Ez a dokumentum a tollaslabda-verseny lebonyolító rendszerhez tervezett meccsgeneráló algoritmus pszeudokódját és működési logikáját tartalmazza.
