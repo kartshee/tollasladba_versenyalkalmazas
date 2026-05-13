@@ -1,126 +1,149 @@
-# Összefoglaló a rendszer jelenlegi állapotáról és a felmerült szakmai kérdésekre adott válaszokról
+# Tervezési döntések és architekturális indoklások
 
-Szia!
+Ez a dokumentum a Tollaslabda Versenykezelő Rendszer (TVR) fejlesztése során hozott főbb tervezési döntéseket és azok szakmai indoklását rögzíti.
 
-Összefoglalom röviden, hogy mire jutottam a rendszerrel kapcsolatban, illetve a felmerült kérdésekre milyen megoldást választottam.
+---
 
-## 1. Csonka round robin
+## 1. Csonka round robin a csoportkörös párosításhoz
 
-Az első fontos téma a csonka round robin volt, ezért ezt részletesebben is kifejtem.
+### A döntés
 
-A klasszikus round robin, vagyis teljes körmérkőzés lényege az, hogy **mindenki játszik mindenkivel**. Ez akkor adja a legpontosabb sorrendet, mert minden résztvevő ugyanazzal a mezőnnyel találkozik. Ennek viszont az a hátránya, hogy nagyobb létszámnál nagyon sok mérkőzés keletkezik, ami amatőr vagy iskolai versenyen gyakran túl hosszú lebonyolítást jelentene.
+A rendszer nem minden esetben alkalmaz teljes körmérkőzést (full round robin). Nagy mezőny esetén **részleges (csonka) round robin** kerül generálásra, ahol minden játékos előre meghatározott, fix számú csoportmeccset kap.
 
-Az én rendszeremben ezért nem minden esetben teljes round robin van, hanem lehet **csonka round robin** is. Ez azt jelenti, hogy **nem minden játékos játszik mindenkivel**, hanem mindenki csak egy előre meghatározott számú csoportmeccset kap. Tehát nem a teljes párosításkészlet kerül lejátszásra, hanem csak annak egy része.
+### Indoklás
 
-A megoldás mögötti gondolat az, hogy számomra a cél nem az, hogy például egy 10–12 fős mezőnyben teljes pontossággal meg lehessen mondani, ki lett a 9., 10. vagy 11. helyezett, hanem az, hogy:
-- reálisan ki lehessen választani a továbbjutókat,
-- vagy megbízhatóan meg lehessen határozni a legjobb 4–6 játékost,
-- majd velük playoffot lehessen játszatni.
+A teljes round robin (`n*(n-1)/2` mérkőzés) garantálja a legpontosabb erősorrendet, azonban `n > 6` játékos felett az időigény amatőr versenykörnyezetben elfogadhatatlanná válik. A rendszer célközönsége — kisebb házi és amatőr versenyek szervezői — számára nem a mezőny végén lévő helyezések tökéletes sorrendje az elsődleges cél, hanem a továbbjutók megbízható azonosítása.
 
-Vagyis ez egy **tudatos kompromisszum**:
-- kevesebb mérkőzés,
-- gyorsabb lebonyolítás,
-- kisebb pálya- és időigény,
-- cserébe nem a teljes mezőnyre ad tökéletesen részletes erősorrendet.
+A csonka round robin ennek megfelelően tudatos kompromisszum:
+- kevesebb mérkőzés, rövidebb lebonyolítási idő,
+- a legjobb játékosok egyértelműen elkülöníthetők a mezőny többi részétől,
+- a pontos erősorrend a továbbjutási határon alul nem garantált.
 
-Ez a gyakorlatban azt jelenti, hogy a rendszer nem arra optimalizál, hogy a mezőny végén lévő helyezések között is teljes bizonyossággal különbséget tegyen, hanem arra, hogy a mezőny elejét, vagyis a továbbjutókat megfelelően el tudja választani.
+### Elhatárolás a svájci rendszertől
 
-Fontos az is, hogy ez **nem svájci rendszer**. A svájci rendszerben a következő fordulók párosításai mindig az addigi eredmények alapján készülnek el. Az én megoldásomban ezzel szemben a párosítások **előre generálódnak**, tehát nem fordulóról fordulóra, az aktuális állás szerint készülnek. Emiatt ez nem Swiss, hanem egy előre meghatározott, részleges round robin megoldás.
+A megvalósított megoldás **nem svájci rendszer**. A svájci rendszerben a párosítások fordulóról fordulóra, az aktuális eredmények alapján készülnek. A TVR-ben ezzel szemben a párosítások **a sorsolás lezárásakor, egyszer generálódnak**, és rögzítve maradnak. Ez egyszerűbb implementációt, kiszámíthatóbb lebonyolítást és egyértelmű auditálhatóságot biztosít.
 
-A rendszer működése röviden így foglalható össze:
-- kis létszámnál továbbra is használható teljes körmérkőzés,
-- nagyobb mezőnynél részleges körmérkőzés fut,
-- ebből kialakul egy csoportsorrend,
-- majd a legjobbak playoffba vagy következő fordulóba jutnak.
+### Implementáció
 
-Ez különösen olyan esetekben hasznos, mint például:
-- diákolimpián 10 játékosból 5 továbbjuttatása,
-- házi versenyen a top 4 kiválasztása,
-- nagyobb amatőr kategóriában a továbbjutók meghatározása úgy, hogy a verseny ne húzódjon el indokolatlanul.
+Páros létszámnál az első `m` körmérkőzéses forduló kerül lejátszásra a klasszikus polygon-rotációs algoritmus alapján. Páratlan létszámnál a körrotáció BYE-eltérést okozna, ezért ilyenkor cirkuláns gráfalapú párosítás kerül alkalmazásra, amely garantálja, hogy minden játékos pontosan `m` mérkőzést kapjon.
 
-Összefoglalva tehát a csonka round robin nálam nem a teljes erősorrend tökéletes meghatározására szolgál, hanem arra, hogy **kezelhető mennyiségű meccsből, reális idő alatt, használható továbbjutási sorrend jöjjön létre**. Ez a rendszer céljához jobban illeszkedik, mint a mindenki-mindenki-ellen modell minden helyzetben történő erőltetése.
+A javasolt `m` értékeket a `recommendMatchesPerPlayer()` függvény határozza meg létszám szerint:
+
+| Létszám | Javasolt mérkőzés/fő |
+|---|---|
+| ≤ 6 | `n − 1` (teljes RR) |
+| 7–10 | 5 |
+| 11–14 | 6 |
+| 15–20 | 6 |
+
+---
 
 ## 2. Támogatott versenyformátumok
 
-A rendszer most már több formátumot is támogat:
+A rendszer három lebonyolítási formátumot támogat kategóriánként:
 
-- sima csoportkörös kategória,
-- csoportkör + playoff,
-- csak playoff, tehát eleve egyenes kieséses kategória.
+| Formátum | Leírás |
+|---|---|
+| `group` | Csak csoportkör, egyenes kiesés nélkül |
+| `group+playoff` | Csoportkör, majd kiemelés alapú egyenes kiesés |
+| `playoff` | Eleve egyenes kieséses kategória, csoportkör nélkül |
 
-A playoff résznél már nem csak a korábbi szűkebb megoldás működik, hanem nagyobb ágak is támogatottak, és a bronzmeccs is kötelezően létrejön, tehát az elődöntők vesztesei le tudják játszani a 3. helyért a mérkőzést.
+A playoff-ágban a bronzmérkőzés minden esetben automatikusan generálódik az elődöntők vesztesei között.
 
-## 3. Több kategória közötti pályabeosztás
+---
 
-A pályabeosztásnál az volt a kérdés, hogyan osztja el a rendszer több kategória között a pályákat.
+## 3. Kategóriák közötti pályabeosztás
 
-Ennél az volt a döntésem, hogy nem akarok kategóriaprioritást, hanem a cél az egyenletes elosztás.
+### A döntés
 
-Ennek megfelelően a globális scheduler:
-- a teljes versenyt együtt nézi,
-- figyeli a szabad pályákat,
-- figyeli a játékosok pihenőidejét,
-- és próbálja egyenletesen elosztani a meccseket a kategóriák között.
+A rendszer **nem alkalmaz kategóriaprioritást**. A globális ütemező az összes kategória várakozó mérkőzését együtt kezeli, és egyenletesen osztja el a pályákon.
 
-Ebben a részben most nem tervezek további módosítást.
+### Indoklás
 
-## 4. Tie-break szabályok a csoportkörben
+Prioritásos elosztásnál az alacsonyabb prioritású kategóriák meccseit a rendszer tartósan háttérbe szoríthatja, ami egyes játékoscsoportokat aránytalanul hosszú várakozásra kényszerítene. Az egyenletes elosztás fairebb versenyélményt biztosít, és a valóságos amatőr versenyek szervezési logikájához jobban igazodik.
 
-A csoporton belüli tie-break kérdésnél fontos felvetés volt a 3-as körbeverés.
+### Implementáció
 
-Ezt a részt átdolgoztam. A rendszerben most már kategóriánként beállítható, hogy 3 vagy több fős holtversenynél:
+A `scheduler.service.js` mohó algoritmusa minden mérkőzéshez azt a pályát és időpontot választja, ahol a legkorábbi kezdés garantálható. Azonos kezdési idő esetén az addig kevesebbet használt pályát részesíti előnyben. Az algoritmus nyilvántartja a játékosok pihenőidejét és a kategóriák eddigi mérkőzésszámát, és ezek alapján biztosítja az egyenletes terheléselosztást.
 
-- csak az egymás elleni mini-tabella számítson,
-- vagy először a mini-tabella számítson, és ha az sem dönt, akkor az összes csoportmeccs statisztikái alapján dőljön el a sorrend.
+---
 
-Ha minden sportági szempont után is marad döntetlen, akkor:
-- vagy közös helyezés adható,
-- vagy kézi döntés szükséges.
+## 4. Holtversenyek feloldása a csoportkörben
 
-## 5. Nevezési díj kezelése
+### A döntés
 
-Felmerült a nevezési díj kezelése is.
+A tie-break logika **háromszintű, konfigurálható** rendszer. A kategóriánkénti `multiTiePolicy` beállítás határozza meg, hogy többjátékos holtversenynél az egymás elleni szűkített tabella után az összesített statisztika is figyelembe vehető-e.
 
-Ezt nem online fizetési rendszerként valósítottam meg, hanem adminisztratív nyilvántartásként.
+### Lépések sorrendben
 
-Tehát a rendszer nem banki tranzakciókat kezel, hanem azt tudja vezetni, hogy:
-- van-e nevezési díj,
-- mennyi az összeg,
-- ki fizette be,
-- mi a számlázási név és cím,
-- illetve azt is, ha például egy egyesület egy összegben fizeti be több játékos nevezését.
+1. **Győzelmi arány**, majd győzelmek száma.
+2. **Kétjátékos holtverseny**: az egymás elleni mérkőzés eredménye dönt.
+3. **Többjátékos holtverseny**: az érintett játékosok egymás elleni mérkőzéseiből épített szűkített (mini) tabella.
+4. Ha a `multiTiePolicy = 'direct_then_overall'`: az összesített szett- és pontkülönbség is alkalmazható tiebreaker-ként.
+5. Ha a holtverseny így sem oldható fel: a rendszer jelzőt helyez el, és a szervezőtől kéri a manuális döntést — nem kényszerít ki sportszakmailag indokolatlan sorrendet.
 
-Ez kifejezetten nyilvántartási célú funkció, nem tényleges fizetési modul.
+### A `unresolvedTiePolicy` beállítás
 
-## 6. Szerepkörök pontosítása
+Ha a feloldatlan holtverseny nem érinti a továbbjutási határt, a szervező dönthet, hogy a játékosok közös helyezést kapjanak (`shared_place`), vagy a rendszer manuális bírói döntést várjon (`manual_override`).
 
-A szerepköröknél pontosítottam a megnevezéseket is.
+---
 
-A rendszer technikai oldalán továbbra is admin felhasználó van, de a versenylogikában ezt a szerepet döntnökként, illetve versenyszervezőként értelmezem.
+## 5. Nevezési díj kezelése adminisztratív nyilvántartásként
 
-Emellett bekerült a játékvezetői szerep is a mérkőzésekhez, tehát egy meccshez külön megadható játékvezető.
+### A döntés
 
-Adogatásbíróval és vonalbíróval nem számolok, mert amatőr versenykörnyezetben ezek jellemzően nincsenek jelen.
+A rendszer **nem valósít meg online fizetési modult**. A nevezési díj kezelése kizárólag adminisztratív nyilvántartás.
 
-## 7. Kijelzős / TV-s nézet backend alapja
+### Indoklás
 
-További fejlesztésként bekerült egy olyan backend végpont is, amely egy későbbi kijelzős vagy TV-s nézetet tud kiszolgálni.
+Banki integrációk (fizetési átjárók, visszautalások, számviteli megfelelőség) megvalósítása szakdolgozati keretek között szükségtelenül növelte volna a projekt komplexitását, és nem illeszkedik az amatőr versenyközeg tényleges igényeihez. A versenyszervezők jellemzően helyszíni készpénzes vagy átutalásos fizetést alkalmaznak.
 
-Ez arra lesz jó, hogy a futó és a következő meccsek külön oldalon megjeleníthetők legyenek, így a játékosok láthatják, mikor és hol játszanak, és nem kell ezt folyamatosan külön megkérdezniük.
+A rendszer ennek megfelelően az alábbi adatokat tartja nyilván:
+- van-e és mennyi a nevezési díj,
+- ki fizette be, mikor és milyen módon,
+- fizetési csoportok (pl. egy egyesület egyszerre fizet több játékos nevezési díját).
 
-## 8. Mi készült el ebben a fejlesztési körben?
+---
 
-Összességében tehát a mostani fejlesztési körben a backend oldalon elkészültek a fő logikai bővítések:
+## 6. Szerepkörök és jogosultságok
 
-- többféle versenyformátum kezelése,
-- playoff és bronzmeccs kezelése,
-- konfigurálható tie-break szabályok,
-- nevezési díj adminisztratív nyilvántartása,
-- döntnök / játékvezető szerepkörök pontosítása,
-- későbbi kijelzős nézet backend alapja.
+### Felhasználói szerepkörök
 
-Ezekre automatizált teszteket is készítettem, és a teljes smoke tesztkör sikeresen lefutott.
+A rendszerben egyetlen jogosultsági szint létezik: az `admin` (versenyszervező / döntnök). Hierarchikus RBAC (Role-Based Access Control) — pl. önálló játékvezetői vagy pénztárosi fiókok — nem kerültek megvalósításra, mivel az amatőr versenyek szervezési modelljében ezek a feladatok jellemzően ugyanazon személy kezében összpontosulnak.
 
-## 9. Következő lépés
+### Mérkőzésszintű játékvezető
 
-A következő lépés már a frontend oldali bekötés és a kezelőfelület bővítése lesz.
+A szerepkörök közötti különbségtétel a mérkőzések szintjén jelenik meg: minden mérkőzéshez opcionálisan rendelhető játékvezető (`umpireName`). Ez nem önálló felhasználói fiókot jelent, hanem a Tournament szintjén konfigurált bírói névlistáról (`referees`) rendelt névazonosítót.
+
+### Tulajdonosi adatelkülönítés
+
+Minden versenyadat a létrehozó felhasználó (`ownerId`) tulajdonához kötött. Az `ownership.service.js` minden adatbázis-műveletnél ellenőrzi ezt a kötést, kizárva az illetéktelen hozzáférés lehetőségét.
+
+---
+
+## 7. Nyilvános kijelzőnézet hitelesítés nélkül
+
+### A döntés
+
+A `/public` végpontcsoport **nem igényel JWT hitelesítést**, és a futó, illetve következő mérkőzések adatait bárki számára elérhető módon szolgálja ki.
+
+### Indoklás
+
+A helyszíni kijelzőkön (pl. TV, projektor) megjelenített versenyzői tájékoztatónak bejelentkezés nélkül kell működnie. Ezek az eszközök jellemzően nem rendelkeznek versenyszervezői fiókkal, és folyamatos, automatikus frissítésre van szükségük. A végpont kizárólag olvasható adatokat ad vissza — módosítást nem tesz lehetővé —, így a hitelesítés elhagyása biztonsági kockázatot nem jelent.
+
+---
+
+## 8. JWT és localStorage — biztonsági kompromisszum
+
+### A döntés
+
+A hitelesítési token a böngésző `localStorage` tárolójában kerül elhelyezésre.
+
+### Kompromisszum
+
+A `localStorage`-ban tárolt token XSS-támadások esetén kiolvasható. Ez az OWASP ajánlásai szerint ismert sebezhetőségi vektor. A döntést az indokolja, hogy:
+- a React keretrendszer beépített DOM-kezelése magas szintű védelmet nyújt az XSS-támadások ellen,
+- a HttpOnly cookie-alapú megközelítés CSRF-védelmet igényelne, ami a projekt komplexitását aránytalanul növelné,
+- a rendszer referencia-alkalmazás jellegű, nem éles, publikus forgalmat kiszolgáló platform.
+
+Ez a tradeoff tudatosan meghozott architekturális döntés, amelynek korlátai a szakdolgozat 2.3 fejezetében kerülnek tárgyalásra.
