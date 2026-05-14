@@ -120,10 +120,6 @@ export function AdminPage({ params }) {
       .filter((item) => item.groups.length > 0);
   }, [categories, groups]);
 
-  // Kategória szűrőhöz tartozó csoportok (meccslista/játékoslista szűrőnél nem kell csoport)
-  const filteredGroups = useMemo(() => {
-    return groups.filter((g) => exportCategoryId ? String(g.categoryId) === exportCategoryId : true);
-  }, [groups, exportCategoryId]);
 
   const matchesCsvPath = useMemo(() => {
     let path = `/api/exports/tournaments/${id}/matches.csv`;
