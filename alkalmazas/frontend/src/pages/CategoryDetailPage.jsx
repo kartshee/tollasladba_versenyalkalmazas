@@ -25,6 +25,7 @@ export function CategoryDetailPage({ params }) {
   const auth = useAuth();
   const [category, setCategory] = useState(null);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -44,10 +45,11 @@ export function CategoryDetailPage({ params }) {
   async function finalizeDraw() {
     setBusy(true);
     setError('');
+    setSuccess('');
     try {
       const updated = await api.post(`/api/categories/${categoryId}/finalize-draw`, {}, { token: auth.token });
       await api.get(`/api/categories/${categoryId}`, { token: auth.token }).then(setCategory);
-      window.alert(`Sorsolás lezárva. Generált meccsek: ${updated.generatedMatches}`);
+      setSuccess(`Sorsolás lezárva. Generált meccsek: ${updated.generatedMatches}`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -68,6 +70,7 @@ export function CategoryDetailPage({ params }) {
       />
 
       {error ? <div className="alert alert--error">{error}</div> : null}
+      {success ? <div className="alert alert--success">{success}</div> : null}
 
       <div className="stats-grid">
         <StatCard label="Formátum" value={formatCategoryFormat(category.format)} />
