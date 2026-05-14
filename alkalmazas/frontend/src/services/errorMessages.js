@@ -55,7 +55,7 @@ const DIRECT_MESSAGE_MAP = {
   'Category is not draw_locked yet': 'A kategória sorsolása még nincs lezárva.',
   'Grace not ended yet': 'A türelmi idő még nem járt le.',
   'Players must differ': 'A két játékosnak különböznie kell.',
-  'Players must belong to this category (MVP)': 'A játékosoknak ebbe a kategóriába kell tartozniuk.',
+  'Players must belong to this category': 'A játékosoknak ebbe a kategóriába kell tartozniuk.',
   'Cannot update players after draw is locked': 'A játékosok már nem módosíthatók a sorsolás lezárása után.',
   'A kért végpont nem található.': 'A kért végpont nem található.',
   'Váratlan szerverhiba történt.': 'Váratlan szerverhiba történt.',

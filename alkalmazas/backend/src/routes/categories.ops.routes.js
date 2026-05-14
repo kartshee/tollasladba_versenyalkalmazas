@@ -637,7 +637,7 @@ router.post('/:id/friendly-match', async (req, res) => {
     }
 
     if (String(p1.categoryId) !== String(category._id) || String(p2.categoryId) !== String(category._id)) {
-        return res.status(400).json({ error: 'Players must belong to this category (MVP)' });
+        return res.status(400).json({ error: 'Players must belong to this category' });
     }
 
     const rand = Math.random().toString(16).slice(2);

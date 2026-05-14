@@ -80,7 +80,6 @@ export function CheckinPage({ params }) {
   async function bulkSetVisible(checkedIn) {
     try {
       for (const player of filteredPlayers) {
-        // eslint-disable-next-line no-await-in-loop
         await api.patch(`/api/players/${player._id}/checkin`, { checkedIn }, { token: auth.token });
       }
       await loadAll();

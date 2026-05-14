@@ -70,7 +70,7 @@ async function main() {
         try {
             wd = await j('PATCH', `/api/groups/${g._id}/withdraw`, {
                 playerId: withdrawPlayerId,
-                reason,              // <- próbálgatjuk
+                reason,
                 policy,
                 note: 'e2e_withdraw.js'
             });

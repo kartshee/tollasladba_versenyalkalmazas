@@ -8,7 +8,7 @@ const playerSchema = new mongoose.Schema(
             required: true
         },
 
-        // MVP: egy játékos egy kategóriában (később Entry modellre bővíthető)
+        // A jelenlegi adatmodellben egy játékos közvetlenül egy kategóriához tartozik.
         categoryId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Category',

@@ -1,5 +1,5 @@
 /**
- * Greedy scheduler (MVP):
+ * Mohó ütemező algoritmus:
  * - courtAvailableAt: mikortól szabad a pálya
  * - playerAvailableAt: mikortól szabad a játékos (pihenővel együtt)
  *

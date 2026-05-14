@@ -92,7 +92,7 @@ function createCustomFinish(baseMatch, winnerId, sets) {
     };
 }
 
-// JAVÍTVA: a voidReason mező csak valóban érvénytelenített (voided: true) meccsekhez való.
+// A voidReason mező csak érvénytelenített (voided: true) meccseknél kerül beállításra.
 // WO esetén az eredmény a resultType: 'wo' mezőn keresztül jelenik meg — voidReason nem kerül beállításra.
 function createWoFinish(baseMatch, winnerId) {
     return {
@@ -1086,7 +1086,7 @@ async function seedConflictTestCategory({ tournament, refereeNames }) {
             sets: [],
             winner: null
         },
-        // JAVÍTVA: érvénytelenített meccs példa (voided: true) — mutatja az érvénytelenítés működését.
+        // Érvénytelenített meccs példa: a felületen és az indítási validációban is ellenőrizhető.
         // Egy eredménnyel már rögzített meccset utólag érvényteleníteni csak admin művelettel lehet.
         {
             tournamentId: tournament._id,

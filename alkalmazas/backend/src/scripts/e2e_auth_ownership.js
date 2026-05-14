@@ -21,7 +21,7 @@ async function main() {
     assert(!listB.some((x) => String(x._id) === String(tA._id)), 'owner B should not see A tournament');
 
     const hidden = await adminB.j('GET', `/api/tournaments/${tA._id}`, null, { expectedStatus: 404 });
-    assert.match(hidden.error, /not found/i);
+    assert.match(hidden.error, /(not found|nem található)/i);
 
     const cA = await adminA.j('POST', '/api/categories', {
         tournamentId: tA._id,
@@ -33,7 +33,7 @@ async function main() {
     assert(cA._id);
 
     const hiddenCategory = await adminB.j('GET', `/api/categories/${cA._id}`, null, { expectedStatus: 404 });
-    assert.match(hiddenCategory.error, /not found/i);
+    assert.match(hiddenCategory.error, /(not found|nem található)/i);
 
     console.log('OK: auth + ownership smoke passed');
     console.log({
