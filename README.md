@@ -55,7 +55,7 @@ A rendszer két felületen működik egyszerre: a versenyszervező egy jelszóva
 ### 1. Repó klónozása
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/kartshee/tollaslabda_versenyalkalmazas.git
 cd tollasladba_versenyalkalmazas
 ```
 
